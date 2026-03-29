@@ -4,7 +4,6 @@ using ClassIsland.Core.Attributes;
 using ClassIsland.Core.Models.Notification;
 using ClassIsland.Shared.Enums;
 using IslandCaller.Models;
-using System.Text;
 
 namespace IslandCaller.Services.NotificationProvidersNew;
 
@@ -17,20 +16,32 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 {
     private readonly ILessonsService lessonsService = lessonsService;
 
-    public async void RandomCall(int stunum)
+    public void RandomCall(int stunum)
     {
-        var sb = new StringBuilder();
+        if (stunum <= 0)
+        {
+            return;
+        }
+
+        var selectedStudents = new List<string>(stunum);
         for (int i = 0; i < stunum; i++)
         {
-            sb.Append(coreService.GetRandomStudent());
-
-            if (i != stunum-1)
+            var student = coreService.GetRandomStudent();
+            if (string.IsNullOrWhiteSpace(student))
             {
-                sb.Append("  ");
+                continue;
             }
+
+            selectedStudents.Add(student);
         }
-        string output = sb.ToString();
-        int maskduration = stunum * 2 + 1; // 计算持续时间
+
+        if (selectedStudents.Count == 0)
+        {
+            return;
+        }
+
+        var output = string.Join("  ", selectedStudents);
+        int maskduration = selectedStudents.Count * 2 + 1; // 计算持续时间
         ShowNotification(new NotificationRequest()
         {
             MaskContent = NotificationContent.CreateTwoIconsMask(output, factory: x =>

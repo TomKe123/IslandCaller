@@ -10,6 +10,7 @@ namespace IslandCaller.Services.IslandCallerService
     {
         private ILessonsService LessonsService { get; }
         private CoreService CoreService {  get; }
+        private IslandCallerNotificationProviderNew NotificationProvider { get; }
         private Plugin Plugin { get; }
         public Status Status { get; set; }
         public IslandCallerService(Plugin plugin, 
@@ -17,12 +18,14 @@ namespace IslandCaller.Services.IslandCallerService
                                     ILessonsService lessonsService,
                                     HistoryService historyService,
                                     CoreService coreService,
+                                    IslandCallerNotificationProviderNew notificationProvider,
                                     Status status
             )
         {
             
             LessonsService = lessonsService;
             CoreService = coreService;
+            NotificationProvider = notificationProvider;
             Plugin = plugin;
             Status = status;
             status.IslandCallerServiceInitialized = false;
@@ -43,7 +46,7 @@ namespace IslandCaller.Services.IslandCallerService
                 "IslandCaller/Simple",
                 args =>
                 {
-                    new IslandCallerNotificationProviderNew(lessonsService,coreService).RandomCall(1);
+                    NotificationProvider.RandomCall(1);
                 }
             );
             uriNavigationService.HandlePluginsNavigation(
@@ -60,7 +63,7 @@ namespace IslandCaller.Services.IslandCallerService
         {
             if(Status.IsPluginReady == false) return;
             Status.OccupationDisable = false;
-            new IslandCallerNotificationProviderNew(LessonsService, CoreService).RandomCall(stunum);
+            NotificationProvider.RandomCall(stunum);
             await Task.Delay(stunum * 2000 + 1000);
             Status.OccupationDisable = true;
         }
