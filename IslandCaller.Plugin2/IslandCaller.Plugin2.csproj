@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0-windows</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <ClassIslandPluginSdkVersion>1.7.106.2-dev-v2</ClassIslandPluginSdkVersion>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+      <PowershellBinaryName>powershell</PowershellBinaryName>
+    </PropertyGroup>
+
+    <Target Name="ForceWindowsPowerShellForCipx"
+        BeforeTargets="CreateCipx"
+        Condition="'$(OS)' == 'Windows_NT'">
+      <PropertyGroup>
+        <PowershellBinaryName>powershell</PowershellBinaryName>
+      </PropertyGroup>
+    </Target>
+
+    <ItemGroup>
+        <PackageReference Include="ClassIsland.PluginSdk" Version="2.0.0.2">
+            <ExcludeAssets>runtime; native</ExcludeAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Views\CsvImport.axaml.cs">
+        <DependentUpon>CsvImport.axaml</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="Icon.ico">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="Icon.png">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="manifest.yml">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="README.md">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+</Project>
