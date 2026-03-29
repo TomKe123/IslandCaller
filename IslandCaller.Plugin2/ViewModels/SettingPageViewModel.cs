@@ -6,6 +6,7 @@ using IslandCaller.Views;
 using ReactiveUI;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Text.Json;
 using System.Windows.Input;
 using static IslandCaller.Services.ProfileService;
 
@@ -40,6 +41,137 @@ namespace IslandCaller.ViewModels
         {
             get => _advancedCallHotkey;
             set => this.RaiseAndSetIfChanged(ref _advancedCallHotkey, value);
+        }
+
+        private bool _isGuaranteeEnabled;
+        public bool IsGuaranteeEnabled
+        {
+            get => _isGuaranteeEnabled;
+            set => this.RaiseAndSetIfChanged(ref _isGuaranteeEnabled, value);
+        }
+
+        private int _guaranteeThreshold;
+        public int GuaranteeThreshold
+        {
+            get => _guaranteeThreshold;
+            set => this.RaiseAndSetIfChanged(ref _guaranteeThreshold, value);
+        }
+
+        private string _guaranteeListText = string.Empty;
+        public string GuaranteeListText
+        {
+            get => _guaranteeListText;
+            set => this.RaiseAndSetIfChanged(ref _guaranteeListText, value);
+        }
+
+        public class GuaranteeWeightModel : ReactiveObject
+        {
+            private string _name = string.Empty;
+            public string Name
+            {
+                get => _name;
+                set => this.RaiseAndSetIfChanged(ref _name, value);
+            }
+
+            private double _weight = 1.0;
+            public double Weight
+            {
+                get => _weight;
+                set => this.RaiseAndSetIfChanged(ref _weight, value);
+            }
+        }
+
+        private ObservableCollection<GuaranteeWeightModel> _guaranteeWeightList = [];
+        public ObservableCollection<GuaranteeWeightModel> GuaranteeWeightList
+        {
+            get => _guaranteeWeightList;
+            set => this.RaiseAndSetIfChanged(ref _guaranteeWeightList, value);
+        }
+
+        public ICommand RemoveGuaranteeRowCommand => new RelayCommand<GuaranteeWeightModel>(row =>
+        {
+            if (row == null)
+            {
+                return;
+            }
+
+            GuaranteeWeightList.Remove(row);
+        });
+
+        public class StatisticsItem : ReactiveObject
+        {
+            private string _metric = string.Empty;
+            public string Metric
+            {
+                get => _metric;
+                set => this.RaiseAndSetIfChanged(ref _metric, value);
+            }
+
+            private string _value = string.Empty;
+            public string Value
+            {
+                get => _value;
+                set => this.RaiseAndSetIfChanged(ref _value, value);
+            }
+        }
+
+        public class HistoryItem : ReactiveObject
+        {
+            private string _name = string.Empty;
+            public string Name
+            {
+                get => _name;
+                set => this.RaiseAndSetIfChanged(ref _name, value);
+            }
+
+            private int _longTermCount;
+            public int LongTermCount
+            {
+                get => _longTermCount;
+                set => this.RaiseAndSetIfChanged(ref _longTermCount, value);
+            }
+
+            private int _sessionMissCount;
+            public int SessionMissCount
+            {
+                get => _sessionMissCount;
+                set => this.RaiseAndSetIfChanged(ref _sessionMissCount, value);
+            }
+
+            private string _lastCallText = string.Empty;
+            public string LastCallText
+            {
+                get => _lastCallText;
+                set => this.RaiseAndSetIfChanged(ref _lastCallText, value);
+            }
+        }
+
+        public class RecentCallItem : ReactiveObject
+        {
+            private int _index;
+            public int Index
+            {
+                get => _index;
+                set => this.RaiseAndSetIfChanged(ref _index, value);
+            }
+
+            private string _name = string.Empty;
+            public string Name
+            {
+                get => _name;
+                set => this.RaiseAndSetIfChanged(ref _name, value);
+            }
+        }
+
+        public ObservableCollection<StatisticsItem> StatisticsList { get; } = [];
+        public ObservableCollection<HistoryItem> HistoryList { get; } = [];
+        public ObservableCollection<RecentCallItem> RecentCallList { get; } = [];
+
+        private string _guaranteeSummaryText = string.Empty;
+        public string GuaranteeSummaryText
+        {
+            get => _guaranteeSummaryText;
+            set => this.RaiseAndSetIfChanged(ref _guaranteeSummaryText, value);
         }
 
         //悬浮窗设置
@@ -117,6 +249,10 @@ namespace IslandCaller.ViewModels
             IsGlobalHotkeyEnabled = Settings.Instance.General.EnableGlobalHotkeys;
             QuickCallHotkey = Settings.Instance.General.QuickCallHotkey;
             AdvancedCallHotkey = Settings.Instance.General.AdvancedCallHotkey;
+            IsGuaranteeEnabled = Settings.Instance.General.EnableGuarantee;
+            GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
+            GuaranteeListText = Settings.Instance.General.GuaranteeListText;
+            GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
             IsHoverEnable = Settings.Instance.Hover.IsEnable;
             HoverScalingFactor = Settings.Instance.Hover.ScalingFactor;
             var profile = profileService.GetMembers(CurrentProfile)
@@ -148,6 +284,32 @@ namespace IslandCaller.ViewModels
                 {
                     Settings.Instance.General.AdvancedCallHotkey = AdvancedCallHotkey;
                 }
+                else if (args.PropertyName == nameof(IsGuaranteeEnabled))
+                {
+                    Settings.Instance.General.EnableGuarantee = IsGuaranteeEnabled;
+                    UpdateGuaranteeSummary(profileService);
+                    RefreshHistoryAndStatistics(historyService);
+                }
+                else if (args.PropertyName == nameof(GuaranteeThreshold))
+                {
+                    Settings.Instance.General.GuaranteeThreshold = Math.Max(1, GuaranteeThreshold);
+                    if (GuaranteeThreshold < 1)
+                    {
+                        GuaranteeThreshold = 1;
+                    }
+                    UpdateGuaranteeSummary(profileService);
+                    RefreshHistoryAndStatistics(historyService);
+                }
+                else if (args.PropertyName == nameof(GuaranteeListText))
+                {
+                    Settings.Instance.General.GuaranteeListText = GuaranteeListText;
+                    UpdateGuaranteeSummary(profileService);
+                }
+                else if (args.PropertyName == nameof(GuaranteeWeightList))
+                {
+                    SaveGuaranteeWeights();
+                    UpdateGuaranteeSummary(profileService);
+                }
                 else if (args.PropertyName == nameof(IsHoverEnable))
                 {
                     Settings.Instance.Hover.IsEnable = IsHoverEnable;
@@ -176,8 +338,19 @@ namespace IslandCaller.ViewModels
                     profileService.SaveProfile(CurrentProfile, list);
                     historyService.Load(CurrentProfile);
                     coreService.InitializeCore();
+                    GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
+                    UpdateGuaranteeSummary(profileService);
+                    RefreshHistoryAndStatistics(historyService);
                 }
             };
+
+            GuaranteeWeightList.CollectionChanged += (_, __) =>
+            {
+                SaveGuaranteeWeights();
+                UpdateGuaranteeListTextFromRows();
+                UpdateGuaranteeSummary(profileService);
+            };
+
             ProfileList.CollectionChanged += (s, e) =>
             {
                 if (e.NewItems != null)
@@ -199,6 +372,9 @@ namespace IslandCaller.ViewModels
                             profileService.SaveProfile(CurrentProfile, list);
                             historyService.Load(CurrentProfile);
                             coreService.InitializeCore();
+                            GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
+                            UpdateGuaranteeSummary(profileService);
+                            RefreshHistoryAndStatistics(historyService);
                         };
 
                         _handlers[student] = handler;
@@ -235,11 +411,195 @@ namespace IslandCaller.ViewModels
                     profileService.SaveProfile(CurrentProfile, list);
                     historyService.Load(CurrentProfile);
                     coreService.InitializeCore();
+                    GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
+                    UpdateGuaranteeSummary(profileService);
+                    RefreshHistoryAndStatistics(historyService);
                 };
 
                 _handlers[student] = handler;
                 student.PropertyChanged += handler;
             }
+
+            UpdateGuaranteeSummary(profileService);
+            RefreshHistoryAndStatistics(historyService);
+        }
+
+        public void AddGuaranteeMember(ProfileService profileService)
+        {
+            var existing = GuaranteeWeightList
+                .Select(x => x.Name)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var candidate = profileService.Members
+                .FirstOrDefault(x => !existing.Contains(x.Name));
+
+            GuaranteeWeightList.Add(new GuaranteeWeightModel
+            {
+                Name = candidate?.Name ?? string.Empty,
+                Weight = 1.0
+            });
+        }
+
+        public void RefreshHistoryAndStatistics(HistoryService historyService)
+        {
+            var snapshot = historyService.GetHistorySnapshot().OrderByDescending(x => x.LongTermCount).ThenBy(x => x.Name).ToList();
+            var totalLongTerm = historyService.GetTotalLongTermCallCount();
+            var average = historyService.GetAverageLongTermCount();
+            var recent = historyService.GetRecentCalls(20);
+
+            HistoryList.Clear();
+            foreach (var item in snapshot)
+            {
+                HistoryList.Add(new HistoryItem
+                {
+                    Name = item.Name,
+                    LongTermCount = item.LongTermCount,
+                    SessionMissCount = item.SessionMissCount,
+                    LastCallText = item.LastCallIndex < 0 ? "未出现" : (item.LastCallIndex + 1).ToString()
+                });
+            }
+
+            StatisticsList.Clear();
+            StatisticsList.Add(new StatisticsItem { Metric = "总点名次数（长期）", Value = totalLongTerm.ToString() });
+            StatisticsList.Add(new StatisticsItem { Metric = "全班长期平均点名次数", Value = average.ToString("F2") });
+            StatisticsList.Add(new StatisticsItem { Metric = "保底状态", Value = IsGuaranteeEnabled ? "开启" : "关闭" });
+            StatisticsList.Add(new StatisticsItem { Metric = "保底阈值", Value = Math.Max(1, GuaranteeThreshold).ToString() });
+            StatisticsList.Add(new StatisticsItem { Metric = "当前名单人数", Value = (ProfileList?.Count ?? 0).ToString() });
+
+            RecentCallList.Clear();
+            int index = 1;
+            foreach (var name in recent)
+            {
+                RecentCallList.Add(new RecentCallItem
+                {
+                    Index = index++,
+                    Name = name
+                });
+            }
+        }
+
+        private void UpdateGuaranteeSummary(ProfileService profileService)
+        {
+            var tokens = GuaranteeWeightList
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (tokens.Count == 0)
+            {
+                GuaranteeSummaryText = "保底名单为空，当前不会触发保底命中。";
+                return;
+            }
+
+            var memberSet = profileService.Members
+                .Select(x => x.Name.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            int matched = tokens.Count(x => memberSet.Contains(x));
+            var missing = tokens.Where(x => !memberSet.Contains(x)).ToList();
+
+            if (missing.Count == 0)
+            {
+                GuaranteeSummaryText = $"保底名单共 {tokens.Count} 人，全部已匹配当前档案。";
+                return;
+            }
+
+            GuaranteeSummaryText = $"保底名单共 {tokens.Count} 人，已匹配 {matched} 人，未匹配 {missing.Count} 人：{string.Join("、", missing)}";
+        }
+
+        private ObservableCollection<GuaranteeWeightModel> BuildGuaranteeWeightList(ProfileService profileService)
+        {
+            var currentMembers = profileService.Members.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var fromSettings = ParseGuaranteeWeightJson(Settings.Instance.General.GuaranteeWeightListJson);
+
+            if (fromSettings.Count == 0)
+            {
+                fromSettings = ParseNameTokens(Settings.Instance.General.GuaranteeListText)
+                    .Select(x => new GuaranteeWeightModel { Name = x, Weight = 1.0 })
+                    .ToList();
+            }
+
+            var cleaned = fromSettings
+                .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                .GroupBy(x => x.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => new GuaranteeWeightModel
+                {
+                    Name = g.First().Name.Trim(),
+                    Weight = Math.Max(0.01, g.Last().Weight)
+                })
+                .OrderByDescending(x => currentMembers.Contains(x.Name))
+                .ThenBy(x => x.Name)
+                .ToList();
+
+            foreach (var item in cleaned)
+            {
+                item.PropertyChanged += (_, __) =>
+                {
+                    if (item.Weight < 0.01)
+                    {
+                        item.Weight = 0.01;
+                    }
+
+                    SaveGuaranteeWeights();
+                    UpdateGuaranteeListTextFromRows();
+                };
+            }
+
+            SaveGuaranteeWeights(cleaned);
+            return new ObservableCollection<GuaranteeWeightModel>(cleaned);
+        }
+
+        private static List<GuaranteeWeightModel> ParseGuaranteeWeightJson(string raw)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<List<GuaranteeWeightModel>>(raw ?? "[]") ?? [];
+            }
+            catch
+            {
+                return [];
+            }
+        }
+
+        private void SaveGuaranteeWeights(List<GuaranteeWeightModel>? source = null)
+        {
+            var list = (source ?? GuaranteeWeightList.ToList())
+                .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                .Select(x => new GuaranteeWeightModel
+                {
+                    Name = x.Name.Trim(),
+                    Weight = Math.Max(0.01, x.Weight)
+                })
+                .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last())
+                .ToList();
+
+            Settings.Instance.General.GuaranteeWeightListJson = JsonSerializer.Serialize(list);
+        }
+
+        private void UpdateGuaranteeListTextFromRows()
+        {
+            GuaranteeListText = string.Join(",", GuaranteeWeightList
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+
+        private static List<string> ParseNameTokens(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return [];
+            }
+
+            return raw
+                .Split([',', '，', '\n', '\r', ' ', '\t', ';', '；', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
     }

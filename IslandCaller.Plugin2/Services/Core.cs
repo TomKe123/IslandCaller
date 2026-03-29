@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
+using IslandCaller.Models;
+using System.Text.Json;
 
 namespace IslandCaller.Services
 {
@@ -97,6 +99,15 @@ namespace IslandCaller.Services
 
         internal string GetRandomStudent()
         {
+            var guaranteed = GetGuaranteedCandidate();
+            if (guaranteed != null)
+            {
+                historyService.Add(guaranteed.Name);
+                logger.LogTrace("保底命中：{Name}, SessionMiss={SessionMiss}", guaranteed.Name, historyService.GetSessionMissCount(guaranteed.Name));
+                ComputeWeightsForAllStudents();
+                return guaranteed.Name;
+            }
+
             // 计算权重总和
             double totalWeight = Persons.Sum(p => p.Weight);
             logger.LogTrace($"计算权重总和: {totalWeight}");
@@ -119,6 +130,103 @@ namespace IslandCaller.Services
             }
             logger.LogWarning($"随机选择学生时发生了意外情况，权重总和: {totalWeight}, 随机数: {r}");
             return "Error"; // 理论上不应该到达这里
+        }
+
+        private Person? GetGuaranteedCandidate()
+        {
+            if (!Settings.Instance.General.EnableGuarantee)
+            {
+                return null;
+            }
+
+            int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
+            var guaranteeWeights = LoadGuaranteeWeightMap();
+            if (guaranteeWeights.Count == 0)
+            {
+                return null;
+            }
+
+            var candidates = Persons
+                .Where(p => guaranteeWeights.ContainsKey(p.Name) && historyService.GetSessionMissCount(p.Name) >= threshold)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+
+            int maxMiss = candidates.Max(c => historyService.GetSessionMissCount(c.Name));
+            var topMissCandidates = candidates
+                .Where(c => historyService.GetSessionMissCount(c.Name) == maxMiss)
+                .ToList();
+
+            double totalWeight = topMissCandidates.Sum(c => Math.Max(0.01, c.Weight * guaranteeWeights[c.Name]));
+            if (totalWeight <= 0)
+            {
+                return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+            }
+
+            double r = Random.Shared.NextDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var person in topMissCandidates)
+            {
+                cumulative += Math.Max(0.01, person.Weight * guaranteeWeights[person.Name]);
+                if (r < cumulative)
+                {
+                    return person;
+                }
+            }
+
+            return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+        }
+
+        private Dictionary<string, double> LoadGuaranteeWeightMap()
+        {
+            try
+            {
+                var items = JsonSerializer.Deserialize<List<GuaranteeWeightItem>>(Settings.Instance.General.GuaranteeWeightListJson ?? "[]") ?? [];
+                var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                foreach (var item in items)
+                {
+                    if (string.IsNullOrWhiteSpace(item.Name))
+                    {
+                        continue;
+                    }
+
+                    result[item.Name.Trim()] = Math.Max(0.01, item.Weight);
+                }
+
+                if (result.Count > 0)
+                {
+                    return result;
+                }
+            }
+            catch
+            {
+                // Fallback to legacy plain-text list when json is invalid.
+            }
+
+            return ParseGuaranteeNames(Settings.Instance.General.GuaranteeListText)
+                .ToDictionary(x => x, _ => 1.0, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private class GuaranteeWeightItem
+        {
+            public string Name { get; set; } = string.Empty;
+            public double Weight { get; set; } = 1.0;
+        }
+
+        private static HashSet<string> ParseGuaranteeNames(string rawText)
+        {
+            if (string.IsNullOrWhiteSpace(rawText))
+            {
+                return [];
+            }
+
+            return rawText
+                .Split([',', '，', '\n', '\r', ' ', '\t', ';', '；', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
     }
 }

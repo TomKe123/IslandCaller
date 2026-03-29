@@ -19,6 +19,10 @@ namespace IslandCaller.Models
             _enableGlobalHotkeys = true;
             _quickCallHotkey = "Ctrl+Alt+R";
             _advancedCallHotkey = "Ctrl+Alt+G";
+            _enableGuarantee = false;
+            _guaranteeThreshold = 8;
+            _guaranteeListText = string.Empty;
+            _guaranteeWeightListJson = "[]";
         }
 
         private Version _version;
@@ -53,6 +57,34 @@ namespace IslandCaller.Models
         {
             get => _advancedCallHotkey;
             set { if (_advancedCallHotkey != value) { _advancedCallHotkey = value; OnPropertyChanged(nameof(AdvancedCallHotkey)); } }
+        }
+
+        private bool _enableGuarantee;
+        public bool EnableGuarantee
+        {
+            get => _enableGuarantee;
+            set { if (_enableGuarantee != value) { _enableGuarantee = value; OnPropertyChanged(nameof(EnableGuarantee)); } }
+        }
+
+        private int _guaranteeThreshold;
+        public int GuaranteeThreshold
+        {
+            get => _guaranteeThreshold;
+            set { if (_guaranteeThreshold != value) { _guaranteeThreshold = value; OnPropertyChanged(nameof(GuaranteeThreshold)); } }
+        }
+
+        private string _guaranteeListText;
+        public string GuaranteeListText
+        {
+            get => _guaranteeListText;
+            set { if (_guaranteeListText != value) { _guaranteeListText = value; OnPropertyChanged(nameof(GuaranteeListText)); } }
+        }
+
+        private string _guaranteeWeightListJson;
+        public string GuaranteeWeightListJson
+        {
+            get => _guaranteeWeightListJson;
+            set { if (_guaranteeWeightListJson != value) { _guaranteeWeightListJson = value; OnPropertyChanged(nameof(GuaranteeWeightListJson)); } }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

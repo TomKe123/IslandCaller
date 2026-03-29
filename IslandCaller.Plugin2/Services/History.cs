@@ -5,8 +5,17 @@ namespace IslandCaller.Services
 {
     public class HistoryService(ProfileService profileService, Status status)
     {
+        public class HistorySnapshotItem
+        {
+            public string Name { get; set; } = string.Empty;
+            public int LongTermCount { get; set; }
+            public int SessionMissCount { get; set; }
+            public int LastCallIndex { get; set; }
+        }
+
         private Dictionary<string, int> historyDict = new();
         private List<string> top20List = new();
+        private Dictionary<string, int> sessionMissCount = new();
         private ProfileService profileService = profileService;
         private Status Status = status;
 
@@ -29,6 +38,7 @@ namespace IslandCaller.Services
         {
             Status.HistoryServiceInitialized = false;
             historyDict.Clear();
+            sessionMissCount.Clear();
 
             string filePath = GetFilePath(guid);
 
@@ -69,6 +79,8 @@ namespace IslandCaller.Services
                 {
                     historyDict[name] = 0;       // CSV 没有 → 记为 0
                 }
+
+                sessionMissCount[name] = 0;
             }
             Status.HistoryServiceInitialized = true;
         }
@@ -79,11 +91,20 @@ namespace IslandCaller.Services
             if (string.IsNullOrWhiteSpace(name))
                 return;
 
+            EnsureMemberCounters();
+
             // 1️ 更新 Dictionary（统计次数）
             if (historyDict.ContainsKey(name))
                 historyDict[name]++;
             else
                 historyDict[name] = 1;
+
+            foreach (var key in sessionMissCount.Keys.ToList())
+            {
+                sessionMissCount[key]++;
+            }
+
+            sessionMissCount[name] = 0;
 
             // 2️ 更新 top20（允许重复）
             top20List.Insert(0, name);
@@ -132,6 +153,14 @@ namespace IslandCaller.Services
             return index;
         }
 
+        public int GetSessionMissCount(string name)
+        {
+            if (sessionMissCount.TryGetValue(name, out int count))
+                return count;
+
+            return 0;
+        }
+
         // 获取长期平均次数
         public double GetAverageLongTermCount()
         {
@@ -144,6 +173,10 @@ namespace IslandCaller.Services
         public void ClearLongTermHistory()
         {
             historyDict.Clear();
+            foreach (var name in profileService.Members.Select(x => x.Name))
+            {
+                historyDict[name] = 0;
+            }
             Save(Settings.Instance.Profile.DefaultProfile);
         }
 
@@ -151,6 +184,56 @@ namespace IslandCaller.Services
         public void ClearThisLessonHistory()
         {
             top20List.Clear();
+            sessionMissCount.Clear();
+            foreach (var name in profileService.Members.Select(x => x.Name))
+            {
+                sessionMissCount[name] = 0;
+            }
+        }
+
+        public IReadOnlyList<HistorySnapshotItem> GetHistorySnapshot()
+        {
+            EnsureMemberCounters();
+
+            return profileService.Members
+                .OrderBy(x => x.Id)
+                .Select(x => new HistorySnapshotItem
+                {
+                    Name = x.Name,
+                    LongTermCount = GetLongTermCount(x.Name),
+                    SessionMissCount = GetSessionMissCount(x.Name),
+                    LastCallIndex = GetLastCallIndex(x.Name)
+                })
+                .ToList();
+        }
+
+        public int GetTotalLongTermCallCount()
+        {
+            return historyDict.Values.Sum();
+        }
+
+        public IReadOnlyList<string> GetRecentCalls(int count)
+        {
+            if (count <= 0)
+                return [];
+
+            return top20List.Take(count).ToList();
+        }
+
+        private void EnsureMemberCounters()
+        {
+            foreach (var member in profileService.Members)
+            {
+                if (!historyDict.ContainsKey(member.Name))
+                {
+                    historyDict[member.Name] = 0;
+                }
+
+                if (!sessionMissCount.ContainsKey(member.Name))
+                {
+                    sessionMissCount[member.Name] = 0;
+                }
+            }
         }
     }
 }

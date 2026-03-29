@@ -67,7 +67,14 @@ public partial class SettingPage : SettingsPageBase
             Gender = 0,
             ManualWeight = 1.0
         });
+        vm.RefreshHistoryAndStatistics(HistoryService);
         logger.LogInformation("手动新增名单项，ID: {Id}", nextId);
+    }
+
+    private void AddGuaranteeMemberButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var profileService = IAppHost.GetService<ProfileService>();
+        vm.AddGuaranteeMember(profileService);
     }
 
     private async void ImportButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -156,6 +163,7 @@ public partial class SettingPage : SettingsPageBase
                 });
 
             vm.ProfileList = new ObservableCollection<StudentModel>(orderedProfile);
+            vm.RefreshHistoryAndStatistics(HistoryService);
             logger.LogInformation("名单导入成功，共导入 {Count} 人", vm.ProfileList.Count);
             await CommonTaskDialogs.ShowDialog("导入完成", $"成功导入 {vm.ProfileList.Count} 条名单。");
         }
@@ -171,6 +179,13 @@ public partial class SettingPage : SettingsPageBase
         logger.LogInformation("清空点名历史记录");
         HistoryService.ClearThisLessonHistory();
         HistoryService.ClearLongTermHistory();
+        vm.RefreshHistoryAndStatistics(HistoryService);
+    }
+
+    private void RefreshHistoryStatsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        vm.RefreshHistoryAndStatistics(HistoryService);
+        logger.LogInformation("刷新历史记录与统计信息");
     }
 
     private void StartQuickHotkeyBindingButton_OnClick(object? sender, RoutedEventArgs e)

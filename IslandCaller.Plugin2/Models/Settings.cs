@@ -48,6 +48,10 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("EnableGlobalHotkeys", Instance.General.EnableGlobalHotkeys);
             IsC_GeneralKey?.SetValue("QuickCallHotkey", Instance.General.QuickCallHotkey);
             IsC_GeneralKey?.SetValue("AdvancedCallHotkey", Instance.General.AdvancedCallHotkey);
+            IsC_GeneralKey?.SetValue("EnableGuarantee", Instance.General.EnableGuarantee);
+            IsC_GeneralKey?.SetValue("GuaranteeThreshold", Instance.General.GuaranteeThreshold);
+            IsC_GeneralKey?.SetValue("GuaranteeListText", Instance.General.GuaranteeListText);
+            IsC_GeneralKey?.SetValue("GuaranteeWeightListJson", Instance.General.GuaranteeWeightListJson);
             IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
             IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
             IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
@@ -93,6 +97,10 @@ namespace IslandCaller.Models
                 Instance.General.EnableGlobalHotkeys = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGlobalHotkeys") ?? true);
                 Instance.General.QuickCallHotkey = (IsC_GeneralKey?.GetValue("QuickCallHotkey") as string) ?? "Ctrl+Alt+R";
                 Instance.General.AdvancedCallHotkey = (IsC_GeneralKey?.GetValue("AdvancedCallHotkey") as string) ?? "Ctrl+Alt+G";
+                Instance.General.EnableGuarantee = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGuarantee") ?? false);
+                Instance.General.GuaranteeThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("GuaranteeThreshold") ?? 8);
+                Instance.General.GuaranteeListText = (IsC_GeneralKey?.GetValue("GuaranteeListText") as string) ?? string.Empty;
+                Instance.General.GuaranteeWeightListJson = (IsC_GeneralKey?.GetValue("GuaranteeWeightListJson") as string) ?? "[]";
                 Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));
                 Instance.Profile.DefaultProfile = Guid.Parse(IsC_ProfileKey?.GetValue("DefaultProfileName") as string);
                 Instance.Profile.IsPreferProfile = Convert.ToBoolean(IsC_ProfileKey?.GetValue("IsPreferProfile") ?? false);
@@ -120,6 +128,10 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("EnableGlobalHotkeys", Instance.General.EnableGlobalHotkeys);
             IsC_GeneralKey?.SetValue("QuickCallHotkey", Instance.General.QuickCallHotkey);
             IsC_GeneralKey?.SetValue("AdvancedCallHotkey", Instance.General.AdvancedCallHotkey);
+            IsC_GeneralKey?.SetValue("EnableGuarantee", Instance.General.EnableGuarantee);
+            IsC_GeneralKey?.SetValue("GuaranteeThreshold", Instance.General.GuaranteeThreshold);
+            IsC_GeneralKey?.SetValue("GuaranteeListText", Instance.General.GuaranteeListText);
+            IsC_GeneralKey?.SetValue("GuaranteeWeightListJson", Instance.General.GuaranteeWeightListJson);
             IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
             IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
             IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
