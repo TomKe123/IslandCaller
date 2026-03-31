@@ -1,0 +1,76 @@
+name: Build CIPX
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_to_release:
+        description: "Push built CIPX to GitHub Release"
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: "Release tag (optional, auto-generated when empty)"
+        required: false
+        type: string
+        default: ""
+  push:
+    tags:
+      - "v*"
+      - "2.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-cipx:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore plugin project
+        run: dotnet restore IslandCaller.Plugin2/IslandCaller.Plugin2.csproj
+
+      - name: Build plugin (Release)
+        run: dotnet build IslandCaller.Plugin2/IslandCaller.Plugin2.csproj -c Release --no-restore
+
+      - name: Create CIPX package
+        run: dotnet msbuild IslandCaller.Plugin2/IslandCaller.Plugin2.csproj /t:CreateCipx /p:Configuration=Release
+
+      - name: Upload CIPX artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: IslandCaller.Plugin2-cipx
+          path: |
+            IslandCaller.Plugin2/cipx/*.cipx
+            IslandCaller.Plugin2/cipx/checksums.md
+          if-no-files-found: error
+
+      - name: Prepare release tag
+        if: github.event_name == 'workflow_dispatch' && inputs.push_to_release
+        id: prepare_release_tag
+        shell: pwsh
+        run: |
+          if ("${{ inputs.release_tag }}" -ne "") {
+            "tag=${{ inputs.release_tag }}" >> $env:GITHUB_OUTPUT
+          }
+          else {
+            "tag=manual-cipx-${{ github.run_number }}" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Push CIPX to GitHub Release
+        if: github.event_name == 'workflow_dispatch' && inputs.push_to_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prepare_release_tag.outputs.tag }}
+          name: ${{ steps.prepare_release_tag.outputs.tag }}
+          prerelease: true
+          files: |
+            IslandCaller.Plugin2/cipx/*.cipx
+            IslandCaller.Plugin2/cipx/checksums.md
