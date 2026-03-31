@@ -51,20 +51,34 @@ jobs:
       - name: Create CIPX package
         run: dotnet msbuild IslandCaller.Plugin2/IslandCaller.Plugin2.csproj /t:CreateCipx /p:Configuration=Release
 
-      - name: Verify CIPX output
+      - name: Locate CIPX output
+        id: locate_cipx
         shell: pwsh
         run: |
-          $cipxFiles = Get-ChildItem "IslandCaller.Plugin2/cipx" -Filter "*.cipx" -File
+          Set-Location "$env:GITHUB_WORKSPACE"
+          $cipxFiles = Get-ChildItem "IslandCaller.Plugin2" -Recurse -Filter "*.cipx" -File | Sort-Object LastWriteTime -Descending
           if ($cipxFiles.Count -eq 0) {
-            throw "No .cipx file generated in IslandCaller.Plugin2/cipx"
+            Write-Host "No .cipx file found. Dumping directory tree for diagnostics..."
+            Get-ChildItem "IslandCaller.Plugin2" -Recurse -File | Select-Object -First 300 | ForEach-Object { $_.FullName }
+            throw "No .cipx file generated under IslandCaller.Plugin2"
           }
+
+          $relativePaths = $cipxFiles | ForEach-Object {
+            (Resolve-Path -Path $_.FullName -Relative).TrimStart('.','/','\\').Replace('\\', '/')
+          }
+
+          "files<<EOF" >> $env:GITHUB_OUTPUT
+          $relativePaths | ForEach-Object { $_ >> $env:GITHUB_OUTPUT }
+          "EOF" >> $env:GITHUB_OUTPUT
+
+          "Detected CIPX files:"
+          $relativePaths | ForEach-Object { "- $_" }
 
       - name: Upload CIPX artifacts
         uses: actions/upload-artifact@v4
         with:
           name: IslandCaller.Plugin2-cipx
-          path: |
-            IslandCaller.Plugin2/cipx/*.cipx
+          path: ${{ steps.locate_cipx.outputs.files }}
           if-no-files-found: error
 
       - name: Prepare release tag
@@ -86,5 +100,4 @@ jobs:
           tag_name: ${{ steps.prepare_release_tag.outputs.tag }}
           name: ${{ steps.prepare_release_tag.outputs.tag }}
           prerelease: ${{ inputs.release_type == 'pre-release' }}
-          files: |
-            IslandCaller.Plugin2/cipx/*.cipx
+          files: ${{ steps.locate_cipx.outputs.files }}
