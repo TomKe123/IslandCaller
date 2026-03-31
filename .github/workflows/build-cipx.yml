@@ -51,13 +51,20 @@ jobs:
       - name: Create CIPX package
         run: dotnet msbuild IslandCaller.Plugin2/IslandCaller.Plugin2.csproj /t:CreateCipx /p:Configuration=Release
 
+      - name: Verify CIPX output
+        shell: pwsh
+        run: |
+          $cipxFiles = Get-ChildItem "IslandCaller.Plugin2/cipx" -Filter "*.cipx" -File
+          if ($cipxFiles.Count -eq 0) {
+            throw "No .cipx file generated in IslandCaller.Plugin2/cipx"
+          }
+
       - name: Upload CIPX artifacts
         uses: actions/upload-artifact@v4
         with:
           name: IslandCaller.Plugin2-cipx
           path: |
             IslandCaller.Plugin2/cipx/*.cipx
-            IslandCaller.Plugin2/cipx/checksums.md
           if-no-files-found: error
 
       - name: Prepare release tag
@@ -81,4 +88,3 @@ jobs:
           prerelease: ${{ inputs.release_type == 'pre-release' }}
           files: |
             IslandCaller.Plugin2/cipx/*.cipx
-            IslandCaller.Plugin2/cipx/checksums.md
