@@ -8,6 +8,14 @@ on:
         required: false
         type: boolean
         default: false
+      release_type:
+        description: "Release type"
+        required: false
+        type: choice
+        default: pre-release
+        options:
+          - pre-release
+          - release
       release_tag:
         description: "Release tag (optional, auto-generated when empty)"
         required: false
@@ -70,7 +78,7 @@ jobs:
         with:
           tag_name: ${{ steps.prepare_release_tag.outputs.tag }}
           name: ${{ steps.prepare_release_tag.outputs.tag }}
-          prerelease: true
+          prerelease: ${{ inputs.release_type == 'pre-release' }}
           files: |
             IslandCaller.Plugin2/cipx/*.cipx
             IslandCaller.Plugin2/cipx/checksums.md
