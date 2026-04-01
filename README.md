@@ -118,11 +118,31 @@ classisland://plugins/IslandCaller/Advanced/GUI
 - 问题反馈：<https://github.com/HUSX100/IslandCaller/issues>
 ---
 
+## 依赖版本
+
+为确保项目正常运行，以下是关键依赖的版本要求（请参考各项目的 `.csproj` 文件）：
+
+### IslandCaller.Plugin2
+- **ClassIsland.PluginSdk**: 2.0.3.1
+- **ClassIsland.Core**: 2.0.3.1（通过 PluginSdk 依赖）
+- **目标框架**: .NET 8.0 (net8.0-windows)
+
+### Previewer（UI 预览工具）
+- **ClassIsland.Core**: 2.0.3.1
+- **Avalonia**: 11.3.12（及相关组件）
+- **目标框架**: .NET 8.0 (net8.0)
+
+> **版本同步提示**：若遇到 `System.IO.FileNotFoundException: Could not load file or assembly 'ClassIsland.Core'` 错误，请确保所有项目引用的 ClassIsland.Core 版本一致，且 Avalonia 依赖版本满足 ClassIsland.Core 的需求（2.0.3.1 需要 Avalonia >= 11.3.12）。
+
+---
+
 ## 致谢
 
 本项目使用了以下第三方库：
 
 - ClassIsland.PluginSdk
+- Avalonia UI Framework
+- QRCoder
 
 ## 许可
 
