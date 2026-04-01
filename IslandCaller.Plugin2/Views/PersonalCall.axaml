@@ -18,9 +18,14 @@
         Height="200"
         Width="500"
         WindowStartupLocation="CenterScreen">
-  <Grid
-    HorizontalAlignment="Center"
-    VerticalAlignment="Stretch">
+  <Panel>
+      <!-- 背景层 -->
+      <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+              Opacity="0.8"
+              IsHitTestVisible="False"/>
+      <Grid
+        HorizontalAlignment="Center"
+        VerticalAlignment="Stretch">
 		<Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="5"/>
@@ -110,4 +115,5 @@
           </Grid>
       </Button>
     </Grid>
+  </Panel>
 </Window>

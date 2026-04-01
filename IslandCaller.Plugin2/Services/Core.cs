@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using IslandCaller.Models;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace IslandCaller.Services
 {
@@ -113,7 +114,7 @@ namespace IslandCaller.Services
             logger.LogTrace($"计算权重总和: {totalWeight}");
             if (totalWeight <= 0) return "Error"; // 避免除以零
             // 生成一个 [0, totalWeight) 的随机数
-            double r = Random.Shared.NextDouble() * totalWeight;
+            double r = GetTrueRandomDouble() * totalWeight;
             logger.LogTrace($"生成随机数: {r} (范围: [0, {totalWeight}))");
             // 根据权重选择学生
             double cumulative = 0;
@@ -166,7 +167,7 @@ namespace IslandCaller.Services
                 return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
             }
 
-            double r = Random.Shared.NextDouble() * totalWeight;
+            double r = GetTrueRandomDouble() * totalWeight;
             double cumulative = 0;
             foreach (var person in topMissCandidates)
             {
@@ -227,6 +228,14 @@ namespace IslandCaller.Services
                 .Split([',', '，', '\n', '\r', ' ', '\t', ';', '；', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static double GetTrueRandomDouble()
+        {
+            var bytes = new byte[8];
+            RandomNumberGenerator.Fill(bytes);
+            var uint64 = BitConverter.ToUInt64(bytes, 0);
+            return (double)(uint64 & 0xFFFFFFFFFFFFFFF) / (double)0x1000000000000000;
         }
     }
 }
