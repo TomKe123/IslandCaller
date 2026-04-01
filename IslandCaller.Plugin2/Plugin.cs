@@ -27,6 +27,7 @@ namespace IslandCaller
         {
             var logger = IAppHost.TryGetService<ILogger<Plugin>>();
             services.AddSingleton<Status>();
+            services.AddSingleton<IslandCallerNotificationProviderNew>();
             services.AddNotificationProvider<IslandCallerNotificationProviderNew>();
             services.AddSingleton<IslandCallerService>();
             services.AddSingleton<ProfileService>();
