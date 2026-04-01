@@ -239,8 +239,8 @@ namespace IslandCaller.Services
             RandomNumberGenerator.Fill(bytes);
             // 转换为UInt64并归一化到[0, 1)范围内
             ulong value = BitConverter.ToUInt64(bytes);
-            // 使用双精度浮点数的有效精度范围
-            return (value >> 11) * (1.0 / 4503599627370496.0); // 1.0 / 2^52
+            // 使用双精度浮点数的有效精度范围（53位）
+            return (value >> 11) * (1.0 / 9007199254740992.0); // 1.0 / 2^53，确保范围[0, 1)
         }
     }
 }
