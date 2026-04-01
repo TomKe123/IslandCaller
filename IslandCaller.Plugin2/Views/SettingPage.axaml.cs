@@ -31,7 +31,7 @@ public partial class SettingPage : SettingsPageBase
         Advanced
     }
 
-    private SettingPageViewModel vm;
+    private SettingPageViewModel? vm;
     private HistoryService HistoryService;
     private ILogger<SettingPage> logger;
     private HotkeyBindingTarget _bindingTarget = HotkeyBindingTarget.None;
@@ -47,18 +47,19 @@ public partial class SettingPage : SettingsPageBase
         InitializeComponent();
         vm = this.DataContext as SettingPageViewModel;
         HistoryService = IAppHost.GetService<HistoryService>();
-        logger = IAppHost.GetService<ILogger<SettingPage>>();
+        logger = IAppHost.TryGetService<ILogger<SettingPage>>();
         AddHandler(InputElement.KeyDownEvent, HotkeyCapture_OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(InputElement.KeyUpEvent, HotkeyCapture_OnKeyUp, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerPressedEvent, HotkeyCapture_OnPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerReleasedEvent, HotkeyCapture_OnPointerReleased, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, HotkeyCapture_OnPointerMoved, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerWheelChangedEvent, HotkeyCapture_OnPointerWheelChanged, RoutingStrategies.Tunnel);
-        logger.LogInformation("SettingPage 初始化完成");
+        logger?.LogInformation("SettingPage 初始化完成");
     }
 
     private void AddButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (vm == null) return;
         int nextId = vm.ProfileList.Any() ? vm.ProfileList.Max(s => s.ID) + 1 : 1;
         vm.ProfileList.Add(new SettingPageViewModel.StudentModel
         {
@@ -68,7 +69,7 @@ public partial class SettingPage : SettingsPageBase
             ManualWeight = 1.0
         });
         vm.RefreshHistoryAndStatistics(HistoryService);
-        logger.LogInformation("手动新增名单项，ID: {Id}", nextId);
+        logger?.LogInformation("手动新增名单项，ID: {Id}", nextId);
     }
 
     private void AddGuaranteeMemberButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -134,12 +135,12 @@ public partial class SettingPage : SettingsPageBase
                     newlist = await new TextFilePraseHelper().ParseTextFileAsync(file);
                     break;
                 case ".json":
-                    var resultJson = await new SecRandomImport().ShowDialog<(bool isGender, string male, string female)>(this.GetVisualRoot() as Window);
-                    logger.LogDebug("SecRandom 导入参数：isGender={IsGender}", resultJson.isGender);
+                    var resultJson = await new SecRandomImport().ShowDialog<(bool isGender, string male, string female)>((this.GetVisualRoot() as Window)!);
+                    logger?.LogDebug("SecRandom 导入参数：isGender={IsGender}", resultJson.isGender);
                     newlist = await new SecRandomParseHelper().ParseSecRandomProfileAsync(file, resultJson.isGender, resultJson.male, resultJson.female);
                     break;
                 case ".csv":
-                    var resultCsv = await new CsvImport().ShowDialog<(int nameRow, int genderRow, bool isGender, string male, string female)>(this.GetVisualRoot() as Window);
+                    var resultCsv = await new CsvImport().ShowDialog<(int nameRow, int genderRow, bool isGender, string male, string female)>((this.GetVisualRoot() as Window)!);
                     resultCsv.nameRow -= 1;
                     resultCsv.genderRow -= 1;
                     if (!resultCsv.isGender) resultCsv.genderRow = -1;
@@ -162,21 +163,25 @@ public partial class SettingPage : SettingsPageBase
                     ManualWeight = m.ManualWeight
                 });
 
-            vm.ProfileList = new ObservableCollection<StudentModel>(orderedProfile);
-            vm.RefreshHistoryAndStatistics(HistoryService);
-            logger.LogInformation("名单导入成功，共导入 {Count} 人", vm.ProfileList.Count);
-            await CommonTaskDialogs.ShowDialog("导入完成", $"成功导入 {vm.ProfileList.Count} 条名单。");
+            if (vm != null)
+            {
+                vm.ProfileList = new ObservableCollection<StudentModel>(orderedProfile);
+                vm.RefreshHistoryAndStatistics(HistoryService);
+                logger?.LogInformation("名单导入成功，共导入 {Count} 人", vm.ProfileList.Count);
+                await CommonTaskDialogs.ShowDialog("导入完成", $"成功导入 {vm.ProfileList.Count} 条名单。");
+            }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "导入名单过程中发生异常，文件：{FileName}", file.Name);
+            logger?.LogError(ex, "导入名单过程中发生异常，文件：{FileName}", file.Name);
             await CommonTaskDialogs.ShowDialog("导入失败", "导入名单时发生错误，请检查文件格式后重试。");
         }
     }
 
     private void ClearButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        logger.LogInformation("清空点名历史记录");
+        logger?.LogInformation("清空点名历史记录");
+        if (vm == null) return;
         HistoryService.ClearThisLessonHistory();
         HistoryService.ClearLongTermHistory();
         vm.RefreshHistoryAndStatistics(HistoryService);
@@ -184,8 +189,8 @@ public partial class SettingPage : SettingsPageBase
 
     private void RefreshHistoryStatsButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        vm.RefreshHistoryAndStatistics(HistoryService);
-        logger.LogInformation("刷新历史记录与统计信息");
+        vm?.RefreshHistoryAndStatistics(HistoryService);
+        logger?.LogInformation("刷新历史记录与统计信息");
     }
 
     private void StartQuickHotkeyBindingButton_OnClick(object? sender, RoutedEventArgs e)
@@ -510,9 +515,11 @@ public partial class SettingPage : SettingsPageBase
             {
                 _bindingHintOverride = "绑定无效：不允许仅使用鼠标左键或右键，请添加组合键。";
                 UpdateHotkeyBindingHint();
-                logger.LogWarning("快捷键绑定无效（单左键/右键）：Target={Target}, Hotkey={Hotkey}", target, hotkeyText);
+                logger?.LogWarning("快捷键绑定无效（单左键/右键）：Target={Target}, Hotkey={Hotkey}", target, hotkeyText);
                 return false;
             }
+
+            if (vm == null) return false;
 
             string otherHotkey = target == HotkeyBindingTarget.Quick
                 ? vm.AdvancedCallHotkey
@@ -522,23 +529,24 @@ public partial class SettingPage : SettingsPageBase
             {
                 _bindingHintOverride = "绑定冲突：快速点名和高级点名不能使用同一个按键，请重新绑定。";
                 UpdateHotkeyBindingHint();
-                logger.LogWarning("快捷键绑定冲突，Target={Target}, Hotkey={Hotkey}", target, hotkeyText);
+                logger?.LogWarning("快捷键绑定冲突，Target={Target}, Hotkey={Hotkey}", target, hotkeyText);
                 return false;
             }
         }
 
         _bindingHintOverride = null;
+        if (vm == null) return false;
         if (target == HotkeyBindingTarget.Quick)
         {
             vm.QuickCallHotkey = hotkeyText;
-            logger.LogInformation("快速点名快捷键已设置为 {Hotkey}", hotkeyText);
+            logger?.LogInformation("快速点名快捷键已设置为 {Hotkey}", hotkeyText);
             return true;
         }
 
         if (target == HotkeyBindingTarget.Advanced)
         {
             vm.AdvancedCallHotkey = hotkeyText;
-            logger.LogInformation("高级点名快捷键已设置为 {Hotkey}", hotkeyText);
+            logger?.LogInformation("高级点名快捷键已设置为 {Hotkey}", hotkeyText);
             return true;
         }
 

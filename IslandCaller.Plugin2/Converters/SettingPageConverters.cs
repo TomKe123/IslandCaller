@@ -6,14 +6,14 @@ namespace IslandCaller.Converters
 
     public class IntToBoolConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is int gender)
                 return gender == 1; // 1 → true
             return false;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool isChecked)
                 return isChecked ? 1 : 0; // true → 1, false → 0
@@ -23,7 +23,7 @@ namespace IslandCaller.Converters
 
     public class GenderConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is int gender)
             {
@@ -33,7 +33,7 @@ namespace IslandCaller.Converters
         }
 
         // 不需要转换回去，直接返回 Binding.DoNothing
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             return Avalonia.Data.BindingOperations.DoNothing;
         }

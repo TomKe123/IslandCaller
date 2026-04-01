@@ -9,20 +9,24 @@ using Microsoft.Extensions.Logging;
 namespace IslandCaller.Views;
 public partial class HoverFluent : Window
 {
-    private HoverFluentViewModel vm { get; set; }
+    private HoverFluentViewModel? vm { get; set; }
     private double scaling { get; set; }
     private bool _isDragging;
     private long _lastPositionLogTime;
     private const int PositionLogIntervalMs = 200;
-    private readonly ILogger<HoverFluent> logger = ClassIsland.Shared.IAppHost.GetService<ILogger<HoverFluent>>();
-    private readonly IslandCallerService IslandCallerService = ClassIsland.Shared.IAppHost.GetService<IslandCallerService>();
-    private readonly WindowTopmostHelper windowTopmostHelper = ClassIsland.Shared.IAppHost.GetService<WindowTopmostHelper>();
-    private readonly WindowDragHelper windowDragHelper = ClassIsland.Shared.IAppHost.GetService<WindowDragHelper>();
+    private ILogger<HoverFluent>? logger;
+    private IslandCallerService? IslandCallerService;
+    private WindowTopmostHelper? windowTopmostHelper;
+    private WindowDragHelper? windowDragHelper;
     private CancellationTokenSource? topmostCts;
 
     public HoverFluent()
     {
         InitializeComponent();
+        logger = ClassIsland.Shared.IAppHost.GetService<ILogger<HoverFluent>>();
+        IslandCallerService = ClassIsland.Shared.IAppHost.GetService<IslandCallerService>();
+        windowTopmostHelper = ClassIsland.Shared.IAppHost.GetService<WindowTopmostHelper>();
+        windowDragHelper = ClassIsland.Shared.IAppHost.GetService<WindowDragHelper>();
     }
 
     protected override void OnOpened(EventArgs e)
@@ -145,7 +149,7 @@ public partial class HoverFluent : Window
 
     private PixelPoint ClampPositionToWorkingArea(PixelPoint current)
     {
-        var screen = Screens.ScreenFromWindow(this)?.WorkingArea ?? Screens.Primary.WorkingArea;
+        var screen = Screens.ScreenFromWindow(this)?.WorkingArea ?? Screens.Primary?.WorkingArea ?? new PixelRect(0, 0, 1920, 1080);
         scaling = RenderScaling;
 
         int x = current.X;

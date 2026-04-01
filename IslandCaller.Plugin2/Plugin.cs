@@ -9,6 +9,7 @@ using IslandCaller.Models;
 using IslandCaller.Services;
 using IslandCaller.Services.IslandCallerService;
 using IslandCaller.Services.NotificationProvidersNew;
+using IslandCaller.ViewModels;
 using IslandCaller.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,7 +21,7 @@ namespace IslandCaller
     [PluginEntrance]
     public class Plugin : PluginBase
     {
-        public Window HoverWindow { get; set; }
+        public Window? HoverWindow { get; set; }
 
         public override void Initialize(HostBuilderContext context, IServiceCollection services)
         {
@@ -34,6 +35,7 @@ namespace IslandCaller
             services.AddSingleton<GlobalHotkeyService>();
             services.AddSingleton<WindowDragHelper>();
             services.AddSingleton<WindowTopmostHelper>();
+            services.AddTransient<HoverFluentViewModel>();
             services.AddSettingsPage<SettingPage>();
             AppBase.Current.AppStarted += async (_, _) =>
             {
@@ -55,8 +57,7 @@ namespace IslandCaller
                     logger.LogInformation("IslandCaller 插件初始化完成");
                     if (Settings.Instance.Hover.IsEnable)
                     {
-                        HoverWindow = new HoverFluent();
-                        HoverWindow.Show();
+                        HoverWindow = new HoverFluent();                        HoverWindow.DataContext = IAppHost.GetService<HoverFluentViewModel>();                        HoverWindow.Show();
                     }
                 }
                 catch (Exception ex)

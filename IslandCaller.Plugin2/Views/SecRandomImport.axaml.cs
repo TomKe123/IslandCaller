@@ -11,7 +11,7 @@ public partial class SecRandomImport : Window
 
     private void Button_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var result = ((bool)isGender.IsChecked, male_input.Text?.ToString() ?? "", female_input.Text?.ToString() ?? "");
+        var result = (isGender.IsChecked == true, male_input.Text?.ToString() ?? "", female_input.Text?.ToString() ?? "");
         Close(result);
     }
 }

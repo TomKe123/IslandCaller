@@ -9,7 +9,7 @@
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="-1"
         ExtendClientAreaToDecorationsHint="True"
-        Background="Transparent"
+        Background="{DynamicResource SurfaceStrokeColorDefaultBrush}"
         SystemDecorations="Full"
         TransparencyLevelHint="Mica"
         ShowInTaskbar="False"
@@ -18,9 +18,10 @@
         Height="200"
         Width="500"
         WindowStartupLocation="CenterScreen">
-  <Grid
-    HorizontalAlignment="Center"
-    VerticalAlignment="Stretch">
+  <Panel Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+      <Grid
+        HorizontalAlignment="Center"
+        VerticalAlignment="Stretch">
 		<Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="5"/>
@@ -62,14 +63,14 @@
             <fa:SettingsExpander.Footer>
                 <Slider
                 Minimum="1"
-                Maximum="5"
+                Maximum="10"
                 TabIndex="1"
                 Width="250"
                 IsSnapToTickEnabled="True"
                 Classes="auto-tooltip"
                 TickFrequency="1"
                 Value="{Binding Num ,Mode=TwoWay}"
-                Ticks="1,2,3,4,5"
+                Ticks="1,2,3,4,5,6,7,8,9,10"
                 TickPlacement="Outside"/>
             </fa:SettingsExpander.Footer>
         </fa:SettingsExpander>
@@ -110,4 +111,5 @@
           </Grid>
       </Button>
     </Grid>
+  </Panel>
 </Window>

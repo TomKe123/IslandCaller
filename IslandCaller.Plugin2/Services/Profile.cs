@@ -9,7 +9,7 @@ namespace IslandCaller.Services
         public class Person
         {
             public int Id { get; set; }
-            public string Name { get; set; }
+            public string Name { get; set; } = string.Empty;
             public int Gender { get; set; }
             public double ManualWeight { get; set; } = 1.0; // 手动权重，默认为 1.0
         }

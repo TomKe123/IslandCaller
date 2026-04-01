@@ -20,10 +20,7 @@
         Topmost="True"
         CanResize="False"
         Focusable="False">
-    <!-- 设置窗口数据上下文 -->
-    <Window.DataContext>
-        <vm:HoverFluentViewModel />
-    </Window.DataContext>
+    
     <Design.DataContext>
         <vm:HoverFluentViewModel />
     </Design.DataContext>

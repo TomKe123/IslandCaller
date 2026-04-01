@@ -46,7 +46,7 @@ public partial class PersonalCall : Window,INotifyPropertyChanged
             return;
         }
 
-        var screen = owner.Screens.ScreenFromWindow(ownerWindow) ?? owner.Screens.Primary;
+        var screen = owner.Screens.ScreenFromWindow(ownerWindow) ?? owner.Screens.Primary ?? throw new Exception("No primary screen found");
         var screenBounds = screen.Bounds;
 
         var ownerScaling = owner.RenderScaling;

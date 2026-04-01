@@ -199,7 +199,7 @@ namespace IslandCaller.ViewModels
                 get => _id;
                 set => this.RaiseAndSetIfChanged(ref _id, value);
             }
-            private string _name;
+            private string _name = string.Empty;
             public string Name
             {
                 get => _name;
@@ -219,7 +219,7 @@ namespace IslandCaller.ViewModels
             }
         }
         private readonly Dictionary<StudentModel, PropertyChangedEventHandler> _handlers = new();
-        private ObservableCollection<StudentModel> _profileList;
+        private ObservableCollection<StudentModel> _profileList = new();
         public ObservableCollection<StudentModel> ProfileList
         {
             get => _profileList;
@@ -227,6 +227,7 @@ namespace IslandCaller.ViewModels
         }
         public ICommand RowCommand => new RelayCommand<StudentModel>(row =>
         {
+            if (row == null) return;
             var firstColumnValue = row.ID;
             var item = ProfileList.FirstOrDefault(p => p.ID == firstColumnValue);
             if (item != null)
@@ -318,7 +319,7 @@ namespace IslandCaller.ViewModels
                         plugin.HoverWindow = new HoverFluent();
                         plugin.HoverWindow.Show();
                     }
-                    else plugin.HoverWindow.Close();
+                    else plugin.HoverWindow?.Close();
                 }
                 else if (args.PropertyName == nameof(HoverScalingFactor))
                 {

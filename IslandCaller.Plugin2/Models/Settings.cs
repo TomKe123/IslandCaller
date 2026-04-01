@@ -38,11 +38,11 @@ namespace IslandCaller.Models
 
         private void InitializeNewInstall()
         {
-            RegistryKey IsC_RootKey = Registry.CurrentUser.CreateSubKey(@"Software\IslandCaller", writable: true);
-            RegistryKey IsC_GeneralKey = IsC_RootKey?.CreateSubKey("General", writable: true);
-            RegistryKey IsC_ProfileKey = IsC_RootKey?.CreateSubKey("Profile", writable: true);
-            RegistryKey IsC_HoverKey = IsC_RootKey?.CreateSubKey("Hover", writable: true);
-            RegistryKey IsC_HoverKey_Position = IsC_HoverKey?.CreateSubKey("Position", writable: true);
+            RegistryKey? IsC_RootKey = Registry.CurrentUser.CreateSubKey(@"Software\IslandCaller", writable: true);
+            RegistryKey? IsC_GeneralKey = IsC_RootKey?.CreateSubKey("General", writable: true);
+            RegistryKey? IsC_ProfileKey = IsC_RootKey?.CreateSubKey("Profile", writable: true);
+            RegistryKey? IsC_HoverKey = IsC_RootKey?.CreateSubKey("Hover", writable: true);
+            RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.CreateSubKey("Position", writable: true);
 
             IsC_GeneralKey?.SetValue("BreakDisable", Instance.General.BreakDisable);
             IsC_GeneralKey?.SetValue("EnableGlobalHotkeys", Instance.General.EnableGlobalHotkeys);
@@ -68,11 +68,11 @@ namespace IslandCaller.Models
 
         public void Load()
         {
-            RegistryKey IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
-            RegistryKey IsC_GeneralKey;
-            RegistryKey IsC_ProfileKey;
-            RegistryKey IsC_HoverKey;
-            RegistryKey IsC_HoverKey_Position;
+            RegistryKey? IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
+            RegistryKey? IsC_GeneralKey;
+            RegistryKey? IsC_ProfileKey;
+            RegistryKey? IsC_HoverKey;
+            RegistryKey? IsC_HoverKey_Position;
 
             if (IsC_RootKey == null)
             {
@@ -102,10 +102,10 @@ namespace IslandCaller.Models
                 Instance.General.GuaranteeListText = (IsC_GeneralKey?.GetValue("GuaranteeListText") as string) ?? string.Empty;
                 Instance.General.GuaranteeWeightListJson = (IsC_GeneralKey?.GetValue("GuaranteeWeightListJson") as string) ?? "[]";
                 Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));
-                Instance.Profile.DefaultProfile = Guid.Parse(IsC_ProfileKey?.GetValue("DefaultProfileName") as string);
+                Instance.Profile.DefaultProfile = Guid.Parse((IsC_ProfileKey?.GetValue("DefaultProfileName") as string) ?? Guid.Empty.ToString());
                 Instance.Profile.IsPreferProfile = Convert.ToBoolean(IsC_ProfileKey?.GetValue("IsPreferProfile") ?? false);
-                Instance.Profile.ProfileList = JsonSerializer.Deserialize<Dictionary<Guid, string>>((IsC_ProfileKey?.GetValue("ProfileList") ?? "{}") as string);
-                Instance.Profile.ProfilePrefer = JsonSerializer.Deserialize<Dictionary<Guid, string>>((IsC_ProfileKey?.GetValue("PreferProfile") ?? "{}") as string);
+                Instance.Profile.ProfileList = JsonSerializer.Deserialize<Dictionary<Guid, string>>(((IsC_ProfileKey?.GetValue("ProfileList") as string) ?? "{}")) ?? new();
+                Instance.Profile.ProfilePrefer = JsonSerializer.Deserialize<Dictionary<Guid, string>>(((IsC_ProfileKey?.GetValue("PreferProfile") as string) ?? "{}")) ?? new();
                 Instance.Hover.IsEnable = Convert.ToBoolean(IsC_HoverKey?.GetValue("IsEnable") ?? true);
                 Instance.Hover.ScalingFactor = Convert.ToDouble(IsC_HoverKey?.GetValue("ScalingFactor") ?? 1.0);
                 Instance.Hover.Position.X = Convert.ToDouble(IsC_HoverKey_Position?.GetValue("X") ?? 200.0);
@@ -118,11 +118,11 @@ namespace IslandCaller.Models
 
         public void Save()
         {
-            RegistryKey IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
-            RegistryKey IsC_GeneralKey = IsC_RootKey?.OpenSubKey("General", writable: true);
-            RegistryKey IsC_ProfileKey = IsC_RootKey?.OpenSubKey("Profile", writable: true);
-            RegistryKey IsC_HoverKey = IsC_RootKey?.OpenSubKey("Hover", writable: true);
-            RegistryKey IsC_HoverKey_Position = IsC_HoverKey?.OpenSubKey("Position", writable: true);
+            RegistryKey? IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
+            RegistryKey? IsC_GeneralKey = IsC_RootKey?.OpenSubKey("General", writable: true);
+            RegistryKey? IsC_ProfileKey = IsC_RootKey?.OpenSubKey("Profile", writable: true);
+            RegistryKey? IsC_HoverKey = IsC_RootKey?.OpenSubKey("Hover", writable: true);
+            RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.OpenSubKey("Position", writable: true);
 
             IsC_GeneralKey?.SetValue("BreakDisable", Instance.General.BreakDisable);
             IsC_GeneralKey?.SetValue("EnableGlobalHotkeys", Instance.General.EnableGlobalHotkeys);

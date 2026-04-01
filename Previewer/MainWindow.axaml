@@ -57,7 +57,7 @@
             <fa:SettingsExpander.Footer>
                 <fa:RangeSlider
                 Minimum="1"
-                Maximum="5"
+                Maximum="10"
                 StepFrequency="1"
                 ShowValueToolTip="True"/>
             </fa:SettingsExpander.Footer>
