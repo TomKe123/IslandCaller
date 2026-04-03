@@ -49,7 +49,7 @@ jobs:
         run: dotnet build IslandCaller.Plugin2/IslandCaller.Plugin2.csproj -c Release --no-restore
 
       - name: Create CIPX package
-        run: dotnet msbuild IslandCaller.Plugin2/IslandCaller.Plugin2.csproj /t:CreateCipx /p:Configuration=Release
+        run: dotnet publish IslandCaller.Plugin2/IslandCaller.Plugin2.csproj -c Release --no-restore -p:CreateCipx=true
 
       - name: Locate CIPX output
         id: locate_cipx

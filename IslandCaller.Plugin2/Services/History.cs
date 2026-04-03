@@ -161,6 +161,25 @@ namespace IslandCaller.Services
             return 0;
         }
 
+        public void ResetSessionMissCounts(IEnumerable<string> names)
+        {
+            EnsureMemberCounters();
+
+            foreach (var name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                var key = name.Trim();
+                if (sessionMissCount.ContainsKey(key))
+                {
+                    sessionMissCount[key] = 0;
+                }
+            }
+        }
+
         // 获取长期平均次数
         public double GetAverageLongTermCount()
         {

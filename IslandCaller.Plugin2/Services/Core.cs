@@ -101,10 +101,15 @@ namespace IslandCaller.Services
 
         internal string GetRandomStudent()
         {
+            int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
+            var guaranteeWeightMap = LoadGuaranteeWeightMap();
+
             var guaranteed = GetGuaranteedCandidate();
             if (guaranteed != null)
             {
+                int sessionMissBeforeHit = historyService.GetSessionMissCount(guaranteed.Name);
                 historyService.Add(guaranteed.Name);
+                RestartGuaranteeCycleIfEarlyHit(guaranteed.Name, guaranteeWeightMap, threshold, sessionMissBeforeHit);
                 logger.LogTrace("保底命中：{Name}, SessionMiss={SessionMiss}", guaranteed.Name, historyService.GetSessionMissCount(guaranteed.Name));
                 ComputeWeightsForAllStudents();
                 return guaranteed.Name;
@@ -124,7 +129,9 @@ namespace IslandCaller.Services
                 cumulative += person.Weight;
                 if (r < cumulative)
                 {
+                    int sessionMissBeforeHit = historyService.GetSessionMissCount(person.Name);
                     historyService.Add(person.Name);
+                    RestartGuaranteeCycleIfEarlyHit(person.Name, guaranteeWeightMap, threshold, sessionMissBeforeHit);
                     logger.LogTrace($"抽取到学生：{person.Name}");
                     ComputeWeightsForAllStudents();
                     return person.Name;
@@ -180,6 +187,28 @@ namespace IslandCaller.Services
             }
 
             return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+        }
+
+        private void RestartGuaranteeCycleIfEarlyHit(string selectedName, Dictionary<string, double> guaranteeWeightMap, int threshold, int? sessionMissBeforeHit = null)
+        {
+            if (!Settings.Instance.General.EnableGuarantee || guaranteeWeightMap.Count == 0)
+            {
+                return;
+            }
+
+            if (!guaranteeWeightMap.ContainsKey(selectedName))
+            {
+                return;
+            }
+
+            int missBeforeHit = sessionMissBeforeHit ?? historyService.GetSessionMissCount(selectedName);
+            if (missBeforeHit >= threshold)
+            {
+                return;
+            }
+
+            historyService.ResetSessionMissCounts(guaranteeWeightMap.Keys);
+            logger.LogTrace("保底提前触发后重置计数：{Name}, MissBeforeHit={MissBeforeHit}, Threshold={Threshold}", selectedName, missBeforeHit, threshold);
         }
 
         private Dictionary<string, double> LoadGuaranteeWeightMap()
