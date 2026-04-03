@@ -78,7 +78,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: IslandCaller.Plugin2-cipx
-          path: ${{ steps.locate_cipx.outputs.files }}
+          path: |
+            IslandCaller.Plugin2/cipx/*.cipx
+            IslandCaller.Plugin2/cipx/**/*.cipx
           if-no-files-found: error
 
       - name: Prepare release tag
