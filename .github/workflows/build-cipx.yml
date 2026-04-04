@@ -48,30 +48,6 @@ jobs:
       - name: Create CIPX package
         run: dotnet publish IslandCaller.Plugin2/IslandCaller.Plugin2.csproj -c Release --no-restore -p:CreateCipx=true
 
-      - name: Locate CIPX output
-        id: locate_cipx
-        shell: pwsh
-        run: |
-          Set-Location "$env:GITHUB_WORKSPACE"
-          $cipxFiles = Get-ChildItem "IslandCaller.Plugin2" -Recurse -Filter "*.cipx" -File | Sort-Object LastWriteTime -Descending
-          if ($cipxFiles.Count -eq 0) {
-            Write-Host "No .cipx file found. Dumping directory tree for diagnostics..."
-            Get-ChildItem "IslandCaller.Plugin2" -Recurse -File | Select-Object -First 300 | ForEach-Object { $_.FullName }
-            throw "No .cipx file generated under IslandCaller.Plugin2"
-          }
-
-          $relativePaths = $cipxFiles | ForEach-Object {
-            $relativePath = (Resolve-Path -Path $_.FullName -Relative) -replace '\\', '/'
-            $relativePath.TrimStart('.', '/')
-          }
-
-          "files<<EOF" >> $env:GITHUB_OUTPUT
-          $relativePaths | ForEach-Object { $_ >> $env:GITHUB_OUTPUT }
-          "EOF" >> $env:GITHUB_OUTPUT
-
-          "Detected CIPX files:"
-          $relativePaths | ForEach-Object { "- $_" }
-
       - name: Upload CIPX artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -79,6 +55,7 @@ jobs:
           path: |
             IslandCaller.Plugin2/cipx/*.cipx
             IslandCaller.Plugin2/cipx/**/*.cipx
+          compression-level: 0
           if-no-files-found: error
 
       - name: Prepare release tag
