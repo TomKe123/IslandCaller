@@ -6,6 +6,7 @@ using IslandCaller.Views;
 using ReactiveUI;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Input;
 using static IslandCaller.Services.ProfileService;
@@ -57,6 +58,13 @@ namespace IslandCaller.ViewModels
             set => this.RaiseAndSetIfChanged(ref _guaranteeThreshold, value);
         }
 
+        private int _pacerThreshold;
+        public int PacerThreshold
+        {
+            get => _pacerThreshold;
+            set => this.RaiseAndSetIfChanged(ref _pacerThreshold, value);
+        }
+
         private string _guaranteeListText = string.Empty;
         public string GuaranteeListText
         {
@@ -100,6 +108,20 @@ namespace IslandCaller.ViewModels
         {
             get => _selectedGuaranteeMember;
             set => this.RaiseAndSetIfChanged(ref _selectedGuaranteeMember, value);
+        }
+
+        private ObservableCollection<string> _pacerList = [];
+        public ObservableCollection<string> PacerList
+        {
+            get => _pacerList;
+            set => this.RaiseAndSetIfChanged(ref _pacerList, value);
+        }
+
+        private string _pacerSummaryText = string.Empty;
+        public string PacerSummaryText
+        {
+            get => _pacerSummaryText;
+            set => this.RaiseAndSetIfChanged(ref _pacerSummaryText, value);
         }
 
         public ICommand RemoveGuaranteeRowCommand => new RelayCommand<GuaranteeWeightModel>(row =>
@@ -266,9 +288,11 @@ namespace IslandCaller.ViewModels
             AdvancedCallHotkey = Settings.Instance.General.AdvancedCallHotkey;
             IsGuaranteeEnabled = Settings.Instance.General.EnableGuarantee;
             GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
+            PacerThreshold = Settings.Instance.General.PacerThreshold;
             GuaranteeListText = Settings.Instance.General.GuaranteeListText;
             GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
             UpdateGuaranteeMemberOptions(profileService);
+            RefreshPacerList(profileService);
             IsHoverEnable = Settings.Instance.Hover.IsEnable;
             HoverScalingFactor = Settings.Instance.Hover.ScalingFactor;
             var profile = profileService.GetMembers(CurrentProfile)
@@ -316,16 +340,29 @@ namespace IslandCaller.ViewModels
                     UpdateGuaranteeSummary(profileService);
                     RefreshHistoryAndStatistics(historyService);
                 }
+                else if (args.PropertyName == nameof(PacerThreshold))
+                {
+                    Settings.Instance.General.PacerThreshold = Math.Max(1, PacerThreshold);
+                    if (PacerThreshold < 1)
+                    {
+                        PacerThreshold = 1;
+                    }
+
+                    RefreshPacerList(profileService);
+                    RefreshHistoryAndStatistics(historyService);
+                }
                 else if (args.PropertyName == nameof(GuaranteeListText))
                 {
                     Settings.Instance.General.GuaranteeListText = GuaranteeListText;
                     UpdateGuaranteeSummary(profileService);
+                    RefreshPacerList(profileService);
                 }
                 else if (args.PropertyName == nameof(GuaranteeWeightList))
                 {
                     SaveGuaranteeWeights();
                     UpdateGuaranteeSummary(profileService);
                     UpdateGuaranteeMemberOptions(profileService);
+                    RefreshPacerList(profileService);
                 }
                 else if (args.PropertyName == nameof(IsHoverEnable))
                 {
@@ -358,6 +395,7 @@ namespace IslandCaller.ViewModels
                     GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
                     UpdateGuaranteeSummary(profileService);
                     UpdateGuaranteeMemberOptions(profileService);
+                    RefreshPacerList(profileService);
                     RefreshHistoryAndStatistics(historyService);
                 }
             };
@@ -368,6 +406,7 @@ namespace IslandCaller.ViewModels
                 UpdateGuaranteeListTextFromRows();
                 UpdateGuaranteeSummary(profileService);
                 UpdateGuaranteeMemberOptions(profileService);
+                RefreshPacerList(profileService);
             };
 
             ProfileList.CollectionChanged += (s, e) =>
@@ -394,6 +433,7 @@ namespace IslandCaller.ViewModels
                             GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
                             UpdateGuaranteeSummary(profileService);
                             UpdateGuaranteeMemberOptions(profileService);
+                            RefreshPacerList(profileService);
                             RefreshHistoryAndStatistics(historyService);
                         };
 
@@ -434,6 +474,7 @@ namespace IslandCaller.ViewModels
                     GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
                     UpdateGuaranteeSummary(profileService);
                     UpdateGuaranteeMemberOptions(profileService);
+                    RefreshPacerList(profileService);
                     RefreshHistoryAndStatistics(historyService);
                 };
 
@@ -495,6 +536,7 @@ namespace IslandCaller.ViewModels
             StatisticsList.Add(new StatisticsItem { Metric = "全班长期平均点名次数", Value = average.ToString("F2") });
             StatisticsList.Add(new StatisticsItem { Metric = "保底状态", Value = IsGuaranteeEnabled ? "开启" : "关闭" });
             StatisticsList.Add(new StatisticsItem { Metric = "保底阈值", Value = Math.Max(1, GuaranteeThreshold).ToString() });
+            StatisticsList.Add(new StatisticsItem { Metric = "陪跑保底阈值", Value = Math.Max(1, PacerThreshold).ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "当前名单人数", Value = (ProfileList?.Count ?? 0).ToString() });
 
             RecentCallList.Clear();
@@ -632,6 +674,92 @@ namespace IslandCaller.ViewModels
             {
                 SelectedGuaranteeMember = null;
             }
+        }
+
+        private void RefreshPacerList(ProfileService profileService)
+        {
+            var guaranteeNames = GuaranteeWeightList
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            int targetCount = Math.Max(2, (int)Math.Floor(guaranteeNames.Count * 1.5));
+
+            var candidateNames = profileService.Members
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(x => !guaranteeNames.Contains(x, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            targetCount = Math.Min(targetCount, candidateNames.Count);
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+
+            var pacerListFromSettings = ParsePacerListJson(Settings.Instance.General.PacerListJson);
+            bool needRegenerate = Settings.Instance.General.PacerListDate != today
+                || pacerListFromSettings.Count != targetCount
+                || pacerListFromSettings.Any(x => guaranteeNames.Contains(x, StringComparer.OrdinalIgnoreCase))
+                || pacerListFromSettings.Any(x => !candidateNames.Contains(x, StringComparer.OrdinalIgnoreCase));
+
+            List<string> pacerList;
+            if (needRegenerate)
+            {
+                pacerList = PickRandomNames(candidateNames, targetCount);
+                Settings.Instance.General.PacerListJson = JsonSerializer.Serialize(pacerList);
+                Settings.Instance.General.PacerListDate = today;
+            }
+            else
+            {
+                pacerList = pacerListFromSettings;
+            }
+
+            PacerList = new ObservableCollection<string>(pacerList);
+
+            if (candidateNames.Count == 0)
+            {
+                PacerSummaryText = "陪跑名单：当前无可选成员（已全部在保底名单或无成员）。";
+            }
+            else
+            {
+                PacerSummaryText = $"陪跑名单：每日随机生成，共 {pacerList.Count} 人（规则：floor(保底人数×1.5)，最少2人）；陪跑成员有小幅权重提升，陪跑保底阈值={Math.Max(1, PacerThreshold)}。";
+            }
+        }
+
+        private static List<string> ParsePacerListJson(string raw)
+        {
+            try
+            {
+                return (JsonSerializer.Deserialize<List<string>>(raw ?? "[]") ?? [])
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch
+            {
+                return [];
+            }
+        }
+
+        private static List<string> PickRandomNames(List<string> source, int count)
+        {
+            if (count <= 0 || source.Count == 0)
+            {
+                return [];
+            }
+
+            var list = source
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = RandomNumberGenerator.GetInt32(i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
+
+            return list.Take(Math.Min(count, list.Count)).ToList();
         }
 
         private void UpdateGuaranteeListTextFromRows()

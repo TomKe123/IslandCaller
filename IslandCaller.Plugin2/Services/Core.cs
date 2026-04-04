@@ -11,6 +11,7 @@ namespace IslandCaller.Services
         private readonly HistoryService historyService = historyService;
         private readonly ILogger<CoreService> logger = logger;
         private readonly Status status = status;
+        private const double MaxPacerWeightBoost = 1.15;
         internal class Person
         {
             internal int Id { get; set; }
@@ -87,6 +88,11 @@ namespace IslandCaller.Services
                 ? LoadGuaranteeWeightMap()
                 : new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             double dynamicGuaranteeBoost = GetDynamicGuaranteeBoost();
+            bool enableGuarantee = Settings.Instance.General.EnableGuarantee;
+            var pacerNameSet = enableGuarantee
+                ? LoadPacerNameSet()
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            double dynamicPacerBoost = enableGuarantee ? GetDynamicPacerBoost() : 1.0;
             logger.LogTrace($"计算全班历史平均被点次数: {avgHist}");
             foreach (var person in Persons)
             {
@@ -101,6 +107,10 @@ namespace IslandCaller.Services
                 if (guaranteeWeights.TryGetValue(person.Name, out var guaranteeWeight))
                 {
                     weight *= Math.Max(0.01, guaranteeWeight) * dynamicGuaranteeBoost;
+                }
+                else if (pacerNameSet.Contains(person.Name))
+                {
+                    weight *= dynamicPacerBoost;
                 }
 
                 person.Weight = weight;
@@ -117,6 +127,15 @@ namespace IslandCaller.Services
             return Math.Min(4.0, boost);
         }
 
+        private double GetDynamicPacerBoost()
+        {
+            int threshold = Math.Max(1, Settings.Instance.General.PacerThreshold);
+            int sessionCallCount = historyService.GetSessionCallCount();
+            double progress = Math.Min(1.0, (double)sessionCallCount / threshold);
+            // 陪跑名单只做轻量提升，最高不超过 1.15 倍。
+            return 1.0 + (MaxPacerWeightBoost - 1.0) * progress;
+        }
+
         internal string GetRandomStudent()
         {
             int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
@@ -131,6 +150,15 @@ namespace IslandCaller.Services
                 logger.LogTrace("保底命中：{Name}, SessionMiss={SessionMiss}", guaranteed.Name, historyService.GetSessionMissCount(guaranteed.Name));
                 ComputeWeightsForAllStudents();
                 return guaranteed.Name;
+            }
+
+            var pacerGuaranteed = GetPacerGuaranteedCandidate(guaranteeWeightMap);
+            if (pacerGuaranteed != null)
+            {
+                historyService.Add(pacerGuaranteed.Name);
+                logger.LogTrace("陪跑保底命中：{Name}, SessionMiss={SessionMiss}", pacerGuaranteed.Name, historyService.GetSessionMissCount(pacerGuaranteed.Name));
+                ComputeWeightsForAllStudents();
+                return pacerGuaranteed.Name;
             }
 
             // 计算权重总和
@@ -207,6 +235,65 @@ namespace IslandCaller.Services
             return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
         }
 
+        private Person? GetPacerGuaranteedCandidate(Dictionary<string, double> guaranteeWeightMap)
+        {
+            if (!Settings.Instance.General.EnableGuarantee)
+            {
+                return null;
+            }
+
+            int pacerThreshold = Math.Max(1, Settings.Instance.General.PacerThreshold);
+            var pacerNames = LoadPacerNameSet();
+            if (pacerNames.Count == 0)
+            {
+                return null;
+            }
+
+            if (guaranteeWeightMap.Count > 0)
+            {
+                pacerNames.ExceptWith(guaranteeWeightMap.Keys);
+            }
+
+            if (pacerNames.Count == 0)
+            {
+                return null;
+            }
+
+            var candidates = Persons
+                .Where(p => pacerNames.Contains(p.Name) && historyService.GetSessionMissCount(p.Name) >= pacerThreshold)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+
+            int maxMiss = candidates.Max(c => historyService.GetSessionMissCount(c.Name));
+            var topMissCandidates = candidates
+                .Where(c => historyService.GetSessionMissCount(c.Name) == maxMiss)
+                .ToList();
+
+            double pacerBoost = GetDynamicPacerBoost();
+            double totalWeight = topMissCandidates.Sum(c => Math.Max(0.01, c.Weight * pacerBoost));
+            if (totalWeight <= 0)
+            {
+                return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+            }
+
+            double r = GetTrueRandomDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var person in topMissCandidates)
+            {
+                cumulative += Math.Max(0.01, person.Weight * pacerBoost);
+                if (r < cumulative)
+                {
+                    return person;
+                }
+            }
+
+            return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+        }
+
         private void RestartGuaranteeCycleIfEarlyHit(string selectedName, Dictionary<string, double> guaranteeWeightMap, int threshold, int? sessionMissBeforeHit = null)
         {
             if (!Settings.Instance.General.EnableGuarantee || guaranteeWeightMap.Count == 0)
@@ -257,6 +344,22 @@ namespace IslandCaller.Services
 
             return ParseGuaranteeNames(Settings.Instance.General.GuaranteeListText)
                 .ToDictionary(x => x, _ => 1.0, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private HashSet<string> LoadPacerNameSet()
+        {
+            try
+            {
+                var items = JsonSerializer.Deserialize<List<string>>(Settings.Instance.General.PacerListJson ?? "[]") ?? [];
+                return items
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim())
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return ParseGuaranteeNames(Settings.Instance.General.PacerListJson);
+            }
         }
 
         private class GuaranteeWeightItem

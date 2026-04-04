@@ -23,6 +23,9 @@ namespace IslandCaller.Models
             _guaranteeThreshold = 40;
             _guaranteeListText = string.Empty;
             _guaranteeWeightListJson = "[]";
+            _pacerListJson = "[]";
+            _pacerListDate = string.Empty;
+            _pacerThreshold = 50;
         }
 
         private Version _version;
@@ -85,6 +88,27 @@ namespace IslandCaller.Models
         {
             get => _guaranteeWeightListJson;
             set { if (_guaranteeWeightListJson != value) { _guaranteeWeightListJson = value; OnPropertyChanged(nameof(GuaranteeWeightListJson)); } }
+        }
+
+        private string _pacerListJson;
+        public string PacerListJson
+        {
+            get => _pacerListJson;
+            set { if (_pacerListJson != value) { _pacerListJson = value; OnPropertyChanged(nameof(PacerListJson)); } }
+        }
+
+        private string _pacerListDate;
+        public string PacerListDate
+        {
+            get => _pacerListDate;
+            set { if (_pacerListDate != value) { _pacerListDate = value; OnPropertyChanged(nameof(PacerListDate)); } }
+        }
+
+        private int _pacerThreshold;
+        public int PacerThreshold
+        {
+            get => _pacerThreshold;
+            set { if (_pacerThreshold != value) { _pacerThreshold = value; OnPropertyChanged(nameof(PacerThreshold)); } }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
