@@ -26,7 +26,7 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             return;
         }
 
-        await ShowRollingAnimation();
+        await ShowCountdownShuffleAnimation();
 
         var selectedStudents = new List<CoreService.DrawResult>(stunum);
         for (int i = 0; i < stunum; i++)
@@ -59,31 +59,93 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
         ShowChainedNotifications(requests);
     }
 
-    private async Task ShowRollingAnimation()
+    private async Task ShowCountdownShuffleAnimation()
     {
-        var names = coreService.StudentNames.ToList();
-        if (names.Count == 0) return;
+        var names = coreService.StudentNames
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (names.Count == 0)
+        {
+            return;
+        }
 
         var random = new Random();
-        var startTime = DateTime.Now;
-        var duration = TimeSpan.FromSeconds(1.5);
-        var interval = 80;
 
-        while (DateTime.Now - startTime < duration)
+        // 第一阶段：倒计时，营造即将揭晓的节奏感。
+        var countdownColors = new IBrush[]
         {
-            var randomInd = random.Next(names.Count);
-            var rollingName = names[randomInd];
-
-            var request = BuildRollingRequest(rollingName);
+            Brushes.OrangeRed,
+            Brushes.Orange,
+            Brushes.Gold
+        };
+        for (int i = 3; i >= 1; i--)
+        {
+            var previewName = names[random.Next(names.Count)];
+            var request = BuildCountdownRequest(i, previewName, countdownColors[3 - i]);
             ShowNotification(request);
+            await Task.Delay(260);
+        }
 
-            await Task.Delay(interval);
+        // 第二阶段：姓名快速跳动并逐步减速，再交给最终抽取结果。
+        var intervals = new[] { 70, 80, 95, 115, 140, 170, 210 };
+        for (int i = 0; i < intervals.Length; i++)
+        {
+            var previewName = names[random.Next(names.Count)];
+            var color = i < intervals.Length / 2 ? Brushes.SlateBlue : Brushes.DodgerBlue;
+            var request = BuildShuffleRequest(previewName, color, intervals[i]);
+            ShowNotification(request);
+            await Task.Delay(intervals[i]);
         }
     }
 
-    private static NotificationRequest BuildRollingRequest(string name)
+    private static NotificationRequest BuildCountdownRequest(int countdown, string previewName, IBrush promptColor)
     {
-        var promptColor = Brushes.Gray;
+        var overlayRoot = new Border
+        {
+            MinWidth = 260,
+            Padding = new Thickness(14, 8),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(2),
+            BorderBrush = promptColor,
+            Background = CreateOverlayBackground(promptColor),
+            Child = new StackPanel
+            {
+                Spacing = 2,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "即将抽取",
+                        Foreground = promptColor,
+                        FontSize = 13,
+                        TextAlignment = TextAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = countdown.ToString(),
+                        Foreground = promptColor,
+                        FontSize = 34,
+                        FontWeight = FontWeight.Bold,
+                        TextAlignment = TextAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = previewName,
+                        Foreground = promptColor,
+                        FontSize = 18,
+                        FontWeight = FontWeight.Medium,
+                        TextAlignment = TextAlignment.Center
+                    }
+                }
+            }
+        };
+
+        return BuildAnimationRequest($"倒计时 {countdown}", overlayRoot, promptColor, TimeSpan.FromMilliseconds(260));
+    }
+
+    private static NotificationRequest BuildShuffleRequest(string previewName, IBrush promptColor, int intervalMs)
+    {
         var overlayRoot = new Border
         {
             MinWidth = 240,
@@ -94,27 +156,38 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             Background = CreateOverlayBackground(promptColor),
             Child = new TextBlock
             {
-                Text = name,
+                Text = previewName,
                 Foreground = promptColor,
-                FontSize = 24,
+                FontSize = 26,
                 FontWeight = FontWeight.SemiBold,
                 TextAlignment = TextAlignment.Center
             }
         };
 
+        var duration = TimeSpan.FromMilliseconds(Math.Max(120, intervalMs + 30));
+        return BuildAnimationRequest("抽取中...", overlayRoot, promptColor, duration);
+    }
+
+    private static NotificationRequest BuildAnimationRequest(string maskText, Control overlayRoot, IBrush promptColor, TimeSpan duration)
+    {
+        var maskContent = NotificationContent.CreateTwoIconsMask(maskText, factory: x =>
+        {
+            x.Duration = duration;
+            x.IsSpeechEnabled = false;
+            x.Color = promptColor;
+        });
+        maskContent.Color = promptColor;
+
+        var overlayContent = new NotificationContent(overlayRoot)
+        {
+            Duration = duration,
+            Color = promptColor
+        };
+
         return new NotificationRequest
         {
-            MaskContent = NotificationContent.CreateTwoIconsMask("正在抽取...", factory: x =>
-            {
-                x.Duration = TimeSpan.FromMilliseconds(150);
-                x.IsSpeechEnabled = false;
-                x.Color = promptColor;
-            }),
-            OverlayContent = new NotificationContent(overlayRoot)
-            {
-                Duration = TimeSpan.FromMilliseconds(150),
-                Color = promptColor
-            },
+            MaskContent = maskContent,
+            OverlayContent = overlayContent,
             RequestNotificationSettings =
             {
                 IsSettingsEnabled = true,
@@ -145,22 +218,27 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             }
         };
 
+        var maskContent = NotificationContent.CreateTwoIconsMask(name, factory: x =>
+        {
+            x.Duration = TimeSpan.FromSeconds(2);
+            x.IsSpeechEnabled = true;
+            x.SpeechContent = name;
+            x.Color = promptColor;
+        });
+        maskContent.Color = promptColor;
+
+        var overlayContent = new NotificationContent(overlayRoot)
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            Color = promptColor
+        };
+
         return new NotificationRequest
         {
             // 仅使用 ClassIsland 原生模板，避免自定义额外遮罩控件。
-            MaskContent = NotificationContent.CreateTwoIconsMask(name, factory: x =>
-            {
-                x.Duration = TimeSpan.FromSeconds(2);
-                x.IsSpeechEnabled = true;
-                x.SpeechContent = name;
-                x.Color = promptColor;
-            }),
+            MaskContent = maskContent,
             // 为正文补充同色卡片，保证提示文本和视觉主体也使用对应颜色。
-            OverlayContent = new NotificationContent(overlayRoot)
-            {
-                Duration = TimeSpan.FromSeconds(2),
-                Color = promptColor
-            },
+            OverlayContent = overlayContent,
             // 强制启用此次提醒的原生特效，确保 Color 能在主屏幕遮罩效果上生效。
             RequestNotificationSettings =
             {

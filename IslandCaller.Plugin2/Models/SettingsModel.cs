@@ -184,7 +184,15 @@ namespace IslandCaller.Models
         public double ScalingFactor
         {
             get => _scalingFactor;
-            set { if (_scalingFactor != value) { _scalingFactor = value; OnPropertyChanged(nameof(ScalingFactor)); } }
+            set
+            {
+                var normalized = Math.Clamp(value, 0.5, 2.0);
+                if (_scalingFactor != normalized)
+                {
+                    _scalingFactor = normalized;
+                    OnPropertyChanged(nameof(ScalingFactor));
+                }
+            }
         }
 
         public PositionSetting Position { get; set; } = new PositionSetting();

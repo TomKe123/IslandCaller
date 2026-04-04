@@ -63,7 +63,7 @@ namespace IslandCaller.Services.IslandCallerService
         {
             if(Status.IsPluginReady == false) return;
             Status.OccupationDisable = false;
-            NotificationProvider.RandomCall(stunum);
+            await NotificationProvider.RandomCall(stunum);
             await Task.Delay(stunum * 2000 + 1000);
             Status.OccupationDisable = true;
         }
