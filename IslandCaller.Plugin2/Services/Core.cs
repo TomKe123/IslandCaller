@@ -106,6 +106,7 @@ namespace IslandCaller.Services
             logger.LogTrace($"计算全班历史平均被点次数: {avgHist}");
             foreach (var person in Persons)
             {
+                string normalizedName = NormalizeName(person.Name);
                 int nHist = historyService.GetLongTermCount(person.Name);
                 int lastHitStep = historyService.GetLastCallIndex(person.Name);
                 double weight = ComputeSingleWeight(
@@ -114,11 +115,11 @@ namespace IslandCaller.Services
                                     nHist,
                                     avgHist);
 
-                if (guaranteeWeights.TryGetValue(person.Name, out var guaranteeWeight))
+                if (guaranteeWeights.TryGetValue(normalizedName, out var guaranteeWeight))
                 {
                     weight *= Math.Max(0.01, guaranteeWeight) * dynamicGuaranteeBoost;
                 }
-                else if (pacerNameSet.Contains(person.Name))
+                else if (pacerNameSet.Contains(normalizedName))
                 {
                     weight *= dynamicPacerBoost;
                 }
@@ -212,12 +213,14 @@ namespace IslandCaller.Services
 
         private static DrawType GetDrawType(string name, Dictionary<string, double> guaranteeWeightMap, HashSet<string> pacerNameSet)
         {
-            if (guaranteeWeightMap.ContainsKey(name))
+            string normalizedName = NormalizeName(name);
+
+            if (guaranteeWeightMap.ContainsKey(normalizedName))
             {
                 return DrawType.Guarantee;
             }
 
-            if (pacerNameSet.Contains(name))
+            if (pacerNameSet.Contains(normalizedName))
             {
                 return DrawType.Pacer;
             }
@@ -240,7 +243,7 @@ namespace IslandCaller.Services
             }
 
             var candidates = Persons
-                .Where(p => guaranteeWeights.ContainsKey(p.Name) && historyService.GetSessionMissCount(p.Name) >= threshold)
+                .Where(p => guaranteeWeights.ContainsKey(NormalizeName(p.Name)) && historyService.GetSessionMissCount(p.Name) >= threshold)
                 .ToList();
 
             if (candidates.Count == 0)
@@ -253,7 +256,7 @@ namespace IslandCaller.Services
                 .Where(c => historyService.GetSessionMissCount(c.Name) == maxMiss)
                 .ToList();
 
-            double totalWeight = topMissCandidates.Sum(c => Math.Max(0.01, c.Weight * guaranteeWeights[c.Name]));
+            double totalWeight = topMissCandidates.Sum(c => Math.Max(0.01, c.Weight * guaranteeWeights[NormalizeName(c.Name)]));
             if (totalWeight <= 0)
             {
                 return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
@@ -263,7 +266,7 @@ namespace IslandCaller.Services
             double cumulative = 0;
             foreach (var person in topMissCandidates)
             {
-                cumulative += Math.Max(0.01, person.Weight * guaranteeWeights[person.Name]);
+                cumulative += Math.Max(0.01, person.Weight * guaranteeWeights[NormalizeName(person.Name)]);
                 if (r < cumulative)
                 {
                     return person;
@@ -287,7 +290,7 @@ namespace IslandCaller.Services
             }
 
             var candidates = Persons
-                .Where(p => pacerNames.Contains(p.Name) && historyService.GetSessionMissCount(p.Name) >= pacerThreshold)
+                .Where(p => pacerNames.Contains(NormalizeName(p.Name)) && historyService.GetSessionMissCount(p.Name) >= pacerThreshold)
                 .ToList();
 
             if (candidates.Count == 0)
@@ -328,7 +331,8 @@ namespace IslandCaller.Services
                 return;
             }
 
-            if (!guaranteeWeightMap.ContainsKey(selectedName))
+            string normalizedSelectedName = NormalizeName(selectedName);
+            if (!guaranteeWeightMap.ContainsKey(normalizedSelectedName))
             {
                 return;
             }
@@ -339,7 +343,12 @@ namespace IslandCaller.Services
                 return;
             }
 
-            historyService.ResetSessionMissCounts(guaranteeWeightMap.Keys);
+            var guaranteeRawNames = Persons
+                .Where(p => guaranteeWeightMap.ContainsKey(NormalizeName(p.Name)))
+                .Select(p => p.Name)
+                .ToList();
+
+            historyService.ResetSessionMissCounts(guaranteeRawNames);
             logger.LogTrace("保底提前触发后重置计数：{Name}, MissBeforeHit={MissBeforeHit}, Threshold={Threshold}", selectedName, missBeforeHit, threshold);
         }
 
@@ -380,7 +389,7 @@ namespace IslandCaller.Services
                 var items = JsonSerializer.Deserialize<List<string>>(Settings.Instance.General.PacerListJson ?? "[]") ?? [];
                 return items
                     .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Select(x => x.Trim())
+                    .Select(NormalizeName)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
             }
             catch
@@ -405,7 +414,13 @@ namespace IslandCaller.Services
             return rawText
                 .Split([',', '，', '\n', '\r', ' ', '\t', ';', '；', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(NormalizeName)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeName(string? rawName)
+        {
+            return rawName?.Trim() ?? string.Empty;
         }
 
         private static double GetTrueRandomDouble()

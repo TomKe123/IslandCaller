@@ -3,6 +3,7 @@ using ClassIsland.Core.Abstractions.Services.NotificationProviders;
 using ClassIsland.Core.Attributes;
 using ClassIsland.Core.Models.Notification;
 using ClassIsland.Shared.Enums;
+using Avalonia.Controls;
 using Avalonia.Media;
 using IslandCaller.Models;
 
@@ -41,27 +42,48 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             return;
         }
 
-        var requests = selectedStudents
-            .Select(result => new NotificationRequest
-            {
-                MaskContent = NotificationContent.CreateTwoIconsMask(result.Name, factory: x =>
-                {
-                    x.Duration = TimeSpan.FromSeconds(2);
-                    x.IsSpeechEnabled = true;
-                    x.SpeechContent = result.Name;
-                    // 使用 ClassIsland 的通知强调动画颜色字段，而不是文本 emoji。
-                    x.Color = ToNotificationColor(result.Type);
-                })
-            })
-            .ToArray();
+        var dominantType = ResolveDominantType(selectedStudents);
+        var promptColor = ToNotificationColor(dominantType);
+        var output = string.Join("  ", selectedStudents.Select(x => x.Name));
+        int durationSeconds = selectedStudents.Count * 2 + 1;
 
-        if (requests.Length == 1)
+        var request = new NotificationRequest
         {
-            ShowNotification(requests[0]);
-            return;
+            MaskContent = NotificationContent.CreateTwoIconsMask(output, factory: x =>
+            {
+                x.Duration = TimeSpan.FromSeconds(durationSeconds);
+                x.IsSpeechEnabled = true;
+                x.SpeechContent = output;
+                // 文档说明此字段用于通知强调动画颜色。
+                x.Color = promptColor;
+            }),
+            OverlayContent = new NotificationContent(new TextBlock
+            {
+                Text = output,
+                Foreground = promptColor
+            })
+            {
+                Duration = TimeSpan.FromSeconds(durationSeconds),
+                Color = promptColor
+            }
+        };
+
+        ShowNotification(request);
+    }
+
+    private static CoreService.DrawType ResolveDominantType(IEnumerable<CoreService.DrawResult> results)
+    {
+        if (results.Any(x => x.Type == CoreService.DrawType.Guarantee))
+        {
+            return CoreService.DrawType.Guarantee;
         }
 
-        ShowChainedNotifications(requests);
+        if (results.Any(x => x.Type == CoreService.DrawType.Pacer))
+        {
+            return CoreService.DrawType.Pacer;
+        }
+
+        return CoreService.DrawType.Normal;
     }
 
     private static IBrush ToNotificationColor(CoreService.DrawType type)
