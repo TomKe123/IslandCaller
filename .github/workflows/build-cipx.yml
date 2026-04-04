@@ -22,9 +22,6 @@ on:
         type: string
         default: ""
   push:
-    tags:
-      - "v*"
-      - "2.*"
 
 permissions:
   contents: write
@@ -98,9 +95,11 @@ jobs:
 
       - name: Push CIPX to GitHub Release
         if: (github.event_name == 'workflow_dispatch' && inputs.push_to_release) || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.prepare_release_tag.outputs.tag || github.ref_name }}
           name: ${{ steps.prepare_release_tag.outputs.tag || github.ref_name }}
           prerelease: ${{ inputs.release_type == 'pre-release' || false }}
-          files: ${{ steps.locate_cipx.outputs.files }}
+          files: |
+            IslandCaller.Plugin2/cipx/*.cipx
+            IslandCaller.Plugin2/cipx/**/*.cipx
