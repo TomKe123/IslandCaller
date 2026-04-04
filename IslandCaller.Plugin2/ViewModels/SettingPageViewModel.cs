@@ -370,6 +370,7 @@ namespace IslandCaller.ViewModels
                     if (IsHoverEnable)
                     {
                         plugin.HoverWindow = new HoverFluent();
+                        plugin.HoverWindow.DataContext = IAppHost.GetService<HoverFluentViewModel>();
                         plugin.HoverWindow.Show();
                     }
                     else plugin.HoverWindow?.Close();

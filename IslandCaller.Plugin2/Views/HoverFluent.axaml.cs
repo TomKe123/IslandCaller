@@ -27,6 +27,7 @@ public partial class HoverFluent : Window
         IslandCallerService = ClassIsland.Shared.IAppHost.GetService<IslandCallerService>();
         windowTopmostHelper = ClassIsland.Shared.IAppHost.GetService<WindowTopmostHelper>();
         windowDragHelper = ClassIsland.Shared.IAppHost.GetService<WindowDragHelper>();
+        DataContext ??= ClassIsland.Shared.IAppHost.GetService<HoverFluentViewModel>();
     }
 
     protected override void OnOpened(EventArgs e)

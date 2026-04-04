@@ -19,14 +19,12 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 {
     private readonly ILessonsService lessonsService = lessonsService;
 
-    public async Task RandomCall(int stunum)
+    public Task RandomCall(int stunum)
     {
         if (stunum <= 0)
         {
-            return;
+            return Task.CompletedTask;
         }
-
-        await ShowCountdownShuffleAnimation();
 
         var selectedStudents = new List<CoreService.DrawResult>(stunum);
         for (int i = 0; i < stunum; i++)
@@ -42,7 +40,7 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
         if (selectedStudents.Count == 0)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var requests = selectedStudents
@@ -52,150 +50,12 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
         if (requests.Length == 1)
         {
             ShowNotification(requests[0]);
-            return;
+            return Task.CompletedTask;
         }
 
         // 多人抽取按顺序逐条弹出姓名。
         ShowChainedNotifications(requests);
-    }
-
-    private async Task ShowCountdownShuffleAnimation()
-    {
-        var names = coreService.StudentNames
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        if (names.Count == 0)
-        {
-            return;
-        }
-
-        var random = new Random();
-
-        // 第一阶段：倒计时，营造即将揭晓的节奏感。
-        var countdownColors = new IBrush[]
-        {
-            Brushes.OrangeRed,
-            Brushes.Orange,
-            Brushes.Gold
-        };
-        for (int i = 3; i >= 1; i--)
-        {
-            var previewName = names[random.Next(names.Count)];
-            var request = BuildCountdownRequest(i, previewName, countdownColors[3 - i]);
-            ShowNotification(request);
-            await Task.Delay(260);
-        }
-
-        // 第二阶段：姓名快速跳动并逐步减速，再交给最终抽取结果。
-        var intervals = new[] { 70, 80, 95, 115, 140, 170, 210 };
-        for (int i = 0; i < intervals.Length; i++)
-        {
-            var previewName = names[random.Next(names.Count)];
-            var color = i < intervals.Length / 2 ? Brushes.SlateBlue : Brushes.DodgerBlue;
-            var request = BuildShuffleRequest(previewName, color, intervals[i]);
-            ShowNotification(request);
-            await Task.Delay(intervals[i]);
-        }
-    }
-
-    private static NotificationRequest BuildCountdownRequest(int countdown, string previewName, IBrush promptColor)
-    {
-        var overlayRoot = new Border
-        {
-            MinWidth = 260,
-            Padding = new Thickness(14, 8),
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(2),
-            BorderBrush = promptColor,
-            Background = CreateOverlayBackground(promptColor),
-            Child = new StackPanel
-            {
-                Spacing = 2,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "即将抽取",
-                        Foreground = promptColor,
-                        FontSize = 13,
-                        TextAlignment = TextAlignment.Center
-                    },
-                    new TextBlock
-                    {
-                        Text = countdown.ToString(),
-                        Foreground = promptColor,
-                        FontSize = 34,
-                        FontWeight = FontWeight.Bold,
-                        TextAlignment = TextAlignment.Center
-                    },
-                    new TextBlock
-                    {
-                        Text = previewName,
-                        Foreground = promptColor,
-                        FontSize = 18,
-                        FontWeight = FontWeight.Medium,
-                        TextAlignment = TextAlignment.Center
-                    }
-                }
-            }
-        };
-
-        return BuildAnimationRequest($"倒计时 {countdown}", overlayRoot, promptColor, TimeSpan.FromMilliseconds(260));
-    }
-
-    private static NotificationRequest BuildShuffleRequest(string previewName, IBrush promptColor, int intervalMs)
-    {
-        var overlayRoot = new Border
-        {
-            MinWidth = 240,
-            Padding = new Thickness(14, 8),
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(2),
-            BorderBrush = promptColor,
-            Background = CreateOverlayBackground(promptColor),
-            Child = new TextBlock
-            {
-                Text = previewName,
-                Foreground = promptColor,
-                FontSize = 26,
-                FontWeight = FontWeight.SemiBold,
-                TextAlignment = TextAlignment.Center
-            }
-        };
-
-        var duration = TimeSpan.FromMilliseconds(Math.Max(120, intervalMs + 30));
-        return BuildAnimationRequest("抽取中...", overlayRoot, promptColor, duration);
-    }
-
-    private static NotificationRequest BuildAnimationRequest(string maskText, Control overlayRoot, IBrush promptColor, TimeSpan duration)
-    {
-        var maskContent = NotificationContent.CreateTwoIconsMask(maskText, factory: x =>
-        {
-            x.Duration = duration;
-            x.IsSpeechEnabled = false;
-            x.Color = promptColor;
-        });
-        maskContent.Color = promptColor;
-
-        var overlayContent = new NotificationContent(overlayRoot)
-        {
-            Duration = duration,
-            Color = promptColor
-        };
-
-        return new NotificationRequest
-        {
-            MaskContent = maskContent,
-            OverlayContent = overlayContent,
-            RequestNotificationSettings =
-            {
-                IsSettingsEnabled = true,
-                IsNotificationEnabled = true,
-                IsNotificationEffectEnabled = true,
-                IsSpeechEnabled = false
-            }
-        };
+        return Task.CompletedTask;
     }
 
     private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)
