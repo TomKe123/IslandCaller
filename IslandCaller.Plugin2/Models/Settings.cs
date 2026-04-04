@@ -98,7 +98,7 @@ namespace IslandCaller.Models
                 Instance.General.QuickCallHotkey = (IsC_GeneralKey?.GetValue("QuickCallHotkey") as string) ?? "Ctrl+Alt+R";
                 Instance.General.AdvancedCallHotkey = (IsC_GeneralKey?.GetValue("AdvancedCallHotkey") as string) ?? "Ctrl+Alt+G";
                 Instance.General.EnableGuarantee = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGuarantee") ?? false);
-                Instance.General.GuaranteeThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("GuaranteeThreshold") ?? 8);
+                Instance.General.GuaranteeThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("GuaranteeThreshold") ?? 40);
                 Instance.General.GuaranteeListText = (IsC_GeneralKey?.GetValue("GuaranteeListText") as string) ?? string.Empty;
                 Instance.General.GuaranteeWeightListJson = (IsC_GeneralKey?.GetValue("GuaranteeWeightListJson") as string) ?? "[]";
                 Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));

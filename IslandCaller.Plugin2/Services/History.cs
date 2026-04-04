@@ -16,6 +16,7 @@ namespace IslandCaller.Services
         private Dictionary<string, int> historyDict = new();
         private List<string> top20List = new();
         private Dictionary<string, int> sessionMissCount = new();
+        private int sessionCallCount = 0;
         private ProfileService profileService = profileService;
         private Status Status = status;
 
@@ -39,6 +40,7 @@ namespace IslandCaller.Services
             Status.HistoryServiceInitialized = false;
             historyDict.Clear();
             sessionMissCount.Clear();
+            sessionCallCount = 0;
 
             string filePath = GetFilePath(guid);
 
@@ -108,6 +110,7 @@ namespace IslandCaller.Services
 
             // 2️ 更新 top20（允许重复）
             top20List.Insert(0, name);
+            sessionCallCount++;
 
             if (top20List.Count > 20)
                 top20List.RemoveAt(top20List.Count - 1);
@@ -161,6 +164,11 @@ namespace IslandCaller.Services
             return 0;
         }
 
+        public int GetSessionCallCount()
+        {
+            return sessionCallCount;
+        }
+
         public void ResetSessionMissCounts(IEnumerable<string> names)
         {
             EnsureMemberCounters();
@@ -204,6 +212,7 @@ namespace IslandCaller.Services
         {
             top20List.Clear();
             sessionMissCount.Clear();
+            sessionCallCount = 0;
             foreach (var name in profileService.Members.Select(x => x.Name))
             {
                 sessionMissCount[name] = 0;

@@ -20,7 +20,7 @@ namespace IslandCaller.Models
             _quickCallHotkey = "Ctrl+Alt+R";
             _advancedCallHotkey = "Ctrl+Alt+G";
             _enableGuarantee = false;
-            _guaranteeThreshold = 8;
+            _guaranteeThreshold = 40;
             _guaranteeListText = string.Empty;
             _guaranteeWeightListJson = "[]";
         }

@@ -83,6 +83,10 @@ namespace IslandCaller.Services
         {
             // 计算全班历史平均被点次数
             double avgHist = historyService.GetAverageLongTermCount();
+            var guaranteeWeights = Settings.Instance.General.EnableGuarantee
+                ? LoadGuaranteeWeightMap()
+                : new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            double dynamicGuaranteeBoost = GetDynamicGuaranteeBoost();
             logger.LogTrace($"计算全班历史平均被点次数: {avgHist}");
             foreach (var person in Persons)
             {
@@ -93,9 +97,24 @@ namespace IslandCaller.Services
                                     lastHitStep,
                                     nHist,
                                     avgHist);
+
+                if (guaranteeWeights.TryGetValue(person.Name, out var guaranteeWeight))
+                {
+                    weight *= Math.Max(0.01, guaranteeWeight) * dynamicGuaranteeBoost;
+                }
+
                 person.Weight = weight;
                 logger.LogTrace($"计算权重 - 学生: {person.Name}, ManualWeight: {person.ManualWeight}, LastHitStep: {lastHitStep}, nHist: {nHist}, Weight: {weight}");
             }
+        }
+
+        private double GetDynamicGuaranteeBoost()
+        {
+            int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
+            int sessionCallCount = historyService.GetSessionCallCount();
+            // 抽取次数越多，保底名单成员权重越大；在一个阈值周期后提升到 2 倍。
+            double boost = 1.0 + (double)sessionCallCount / threshold;
+            return Math.Min(4.0, boost);
         }
 
         internal string GetRandomStudent()

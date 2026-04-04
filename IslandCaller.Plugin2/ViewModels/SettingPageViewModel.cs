@@ -88,6 +88,20 @@ namespace IslandCaller.ViewModels
             set => this.RaiseAndSetIfChanged(ref _guaranteeWeightList, value);
         }
 
+        private ObservableCollection<string> _guaranteeMemberOptions = [];
+        public ObservableCollection<string> GuaranteeMemberOptions
+        {
+            get => _guaranteeMemberOptions;
+            set => this.RaiseAndSetIfChanged(ref _guaranteeMemberOptions, value);
+        }
+
+        private string? _selectedGuaranteeMember;
+        public string? SelectedGuaranteeMember
+        {
+            get => _selectedGuaranteeMember;
+            set => this.RaiseAndSetIfChanged(ref _selectedGuaranteeMember, value);
+        }
+
         public ICommand RemoveGuaranteeRowCommand => new RelayCommand<GuaranteeWeightModel>(row =>
         {
             if (row == null)
@@ -254,6 +268,7 @@ namespace IslandCaller.ViewModels
             GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
             GuaranteeListText = Settings.Instance.General.GuaranteeListText;
             GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
+            UpdateGuaranteeMemberOptions(profileService);
             IsHoverEnable = Settings.Instance.Hover.IsEnable;
             HoverScalingFactor = Settings.Instance.Hover.ScalingFactor;
             var profile = profileService.GetMembers(CurrentProfile)
@@ -310,6 +325,7 @@ namespace IslandCaller.ViewModels
                 {
                     SaveGuaranteeWeights();
                     UpdateGuaranteeSummary(profileService);
+                    UpdateGuaranteeMemberOptions(profileService);
                 }
                 else if (args.PropertyName == nameof(IsHoverEnable))
                 {
@@ -341,6 +357,7 @@ namespace IslandCaller.ViewModels
                     coreService.InitializeCore();
                     GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
                     UpdateGuaranteeSummary(profileService);
+                    UpdateGuaranteeMemberOptions(profileService);
                     RefreshHistoryAndStatistics(historyService);
                 }
             };
@@ -350,6 +367,7 @@ namespace IslandCaller.ViewModels
                 SaveGuaranteeWeights();
                 UpdateGuaranteeListTextFromRows();
                 UpdateGuaranteeSummary(profileService);
+                UpdateGuaranteeMemberOptions(profileService);
             };
 
             ProfileList.CollectionChanged += (s, e) =>
@@ -375,6 +393,7 @@ namespace IslandCaller.ViewModels
                             coreService.InitializeCore();
                             GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
                             UpdateGuaranteeSummary(profileService);
+                            UpdateGuaranteeMemberOptions(profileService);
                             RefreshHistoryAndStatistics(historyService);
                         };
 
@@ -414,6 +433,7 @@ namespace IslandCaller.ViewModels
                     coreService.InitializeCore();
                     GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
                     UpdateGuaranteeSummary(profileService);
+                    UpdateGuaranteeMemberOptions(profileService);
                     RefreshHistoryAndStatistics(historyService);
                 };
 
@@ -427,19 +447,28 @@ namespace IslandCaller.ViewModels
 
         public void AddGuaranteeMember(ProfileService profileService)
         {
-            var existing = GuaranteeWeightList
-                .Select(x => x.Name)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string selected = SelectedGuaranteeMember?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(selected))
+            {
+                return;
+            }
 
-            var candidate = profileService.Members
-                .FirstOrDefault(x => !existing.Contains(x.Name));
+            bool exists = GuaranteeWeightList.Any(x => string.Equals(x.Name?.Trim(), selected, StringComparison.OrdinalIgnoreCase));
+            if (exists)
+            {
+                SelectedGuaranteeMember = null;
+                UpdateGuaranteeMemberOptions(profileService);
+                return;
+            }
 
             GuaranteeWeightList.Add(new GuaranteeWeightModel
             {
-                Name = candidate?.Name ?? string.Empty,
+                Name = selected,
                 Weight = 1.0
             });
+
+            SelectedGuaranteeMember = null;
+            UpdateGuaranteeMemberOptions(profileService);
         }
 
         public void RefreshHistoryAndStatistics(HistoryService historyService)
@@ -579,6 +608,30 @@ namespace IslandCaller.ViewModels
                 .ToList();
 
             Settings.Instance.General.GuaranteeWeightListJson = JsonSerializer.Serialize(list);
+        }
+
+        private void UpdateGuaranteeMemberOptions(ProfileService profileService)
+        {
+            var selectedNames = GuaranteeWeightList
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var options = profileService.Members
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(x => !selectedNames.Contains(x))
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            GuaranteeMemberOptions = new ObservableCollection<string>(options);
+
+            if (!string.IsNullOrWhiteSpace(SelectedGuaranteeMember) &&
+                !GuaranteeMemberOptions.Any(x => string.Equals(x, SelectedGuaranteeMember, StringComparison.OrdinalIgnoreCase)))
+            {
+                SelectedGuaranteeMember = null;
+            }
         }
 
         private void UpdateGuaranteeListTextFromRows()
