@@ -3,6 +3,7 @@ using ClassIsland.Core.Abstractions.Services.NotificationProviders;
 using ClassIsland.Core.Attributes;
 using ClassIsland.Core.Models.Notification;
 using ClassIsland.Shared.Enums;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using IslandCaller.Models;
@@ -44,31 +45,66 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
         var dominantType = ResolveDominantType(selectedStudents);
         var promptColor = ToNotificationColor(dominantType);
-        var output = string.Join("  ", selectedStudents.Select(x => x.Name));
-        int durationSeconds = selectedStudents.Count * 2 + 1;
+        var requests = selectedStudents
+            .Select(x => BuildSingleNameRequest(x.Name, promptColor))
+            .ToArray();
 
-        var request = new NotificationRequest
+        if (requests.Length == 1)
         {
-            MaskContent = NotificationContent.CreateTwoIconsMask(output, factory: x =>
+            ShowNotification(requests[0]);
+            return;
+        }
+
+        // 多人抽取按顺序逐条弹出姓名。
+        ShowChainedNotifications(requests);
+    }
+
+    private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)
+    {
+        var overlayRoot = new Border
+        {
+            MinWidth = 220,
+            Padding = new Thickness(14, 8),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(2),
+            BorderBrush = promptColor,
+            Background = CreateOverlayBackground(promptColor),
+            Child = new TextBlock
             {
-                x.Duration = TimeSpan.FromSeconds(durationSeconds);
-                x.IsSpeechEnabled = true;
-                x.SpeechContent = output;
-                // 文档说明此字段用于通知强调动画颜色。
-                x.Color = promptColor;
-            }),
-            OverlayContent = new NotificationContent(new TextBlock
-            {
-                Text = output,
-                Foreground = promptColor
-            })
-            {
-                Duration = TimeSpan.FromSeconds(durationSeconds),
-                Color = promptColor
+                Text = name,
+                Foreground = promptColor,
+                FontSize = 22,
+                FontWeight = FontWeight.SemiBold,
+                TextAlignment = TextAlignment.Center
             }
         };
 
-        ShowNotification(request);
+        return new NotificationRequest
+        {
+            MaskContent = NotificationContent.CreateTwoIconsMask(name, factory: x =>
+            {
+                x.Duration = TimeSpan.FromSeconds(2);
+                x.IsSpeechEnabled = true;
+                x.SpeechContent = name;
+                x.Color = promptColor;
+            }),
+            OverlayContent = new NotificationContent(overlayRoot)
+            {
+                Duration = TimeSpan.FromSeconds(2),
+                Color = promptColor
+            }
+        };
+    }
+
+    private static IBrush CreateOverlayBackground(IBrush promptColor)
+    {
+        if (promptColor is ISolidColorBrush solid)
+        {
+            var c = solid.Color;
+            return new SolidColorBrush(Color.FromArgb(40, c.R, c.G, c.B));
+        }
+
+        return Brushes.Transparent;
     }
 
     private static CoreService.DrawType ResolveDominantType(IEnumerable<CoreService.DrawResult> results)
