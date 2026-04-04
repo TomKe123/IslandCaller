@@ -52,9 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: IslandCaller.Plugin2-cipx
-          path: |
-            IslandCaller.Plugin2/cipx/*.cipx
-            IslandCaller.Plugin2/cipx/**/*.cipx
+          path: IslandCaller.Plugin2/cipx/IslandCaller.Plugin2.cipx
           compression-level: 0
           if-no-files-found: error
 
@@ -77,6 +75,4 @@ jobs:
           tag_name: ${{ steps.prepare_release_tag.outputs.tag || github.ref_name }}
           name: ${{ steps.prepare_release_tag.outputs.tag || github.ref_name }}
           prerelease: ${{ inputs.release_type == 'pre-release' || false }}
-          files: |
-            IslandCaller.Plugin2/cipx/*.cipx
-            IslandCaller.Plugin2/cipx/**/*.cipx
+          files: IslandCaller.Plugin2/cipx/IslandCaller.Plugin2.cipx
