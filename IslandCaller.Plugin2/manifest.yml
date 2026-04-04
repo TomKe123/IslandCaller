@@ -9,7 +9,7 @@ description: 轻量级课堂点名插件 | 支持加权随机、历史均衡、�
 entranceAssembly: "IslandCaller.Plugin2.dll"
 url: https://github.com/TomKe123/IslandCaller
 author: TomKe123
-version: 2.0.1.0
+version: 2.0.2.0
 apiVersion: 2.0.0.0
 icon: Icon.ico
 repoOwner: TomKe123
