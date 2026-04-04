@@ -3,6 +3,8 @@ using ClassIsland.Core.Abstractions.Services.NotificationProviders;
 using ClassIsland.Core.Attributes;
 using ClassIsland.Core.Models.Notification;
 using ClassIsland.Shared.Enums;
+using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media;
 using IslandCaller.Models;
 
@@ -57,6 +59,24 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
     private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)
     {
+        var overlayRoot = new Border
+        {
+            MinWidth = 240,
+            Padding = new Thickness(14, 8),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(2),
+            BorderBrush = promptColor,
+            Background = CreateOverlayBackground(promptColor),
+            Child = new TextBlock
+            {
+                Text = name,
+                Foreground = promptColor,
+                FontSize = 24,
+                FontWeight = FontWeight.SemiBold,
+                TextAlignment = TextAlignment.Center
+            }
+        };
+
         return new NotificationRequest
         {
             // 仅使用 ClassIsland 原生模板，避免自定义额外遮罩控件。
@@ -67,6 +87,12 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
                 x.SpeechContent = name;
                 x.Color = promptColor;
             }),
+            // 为正文补充同色卡片，保证提示文本和视觉主体也使用对应颜色。
+            OverlayContent = new NotificationContent(overlayRoot)
+            {
+                Duration = TimeSpan.FromSeconds(2),
+                Color = promptColor
+            },
             // 强制启用此次提醒的原生特效，确保 Color 能在主屏幕遮罩效果上生效。
             RequestNotificationSettings =
             {
@@ -76,6 +102,17 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
                 IsSpeechEnabled = true
             }
         };
+    }
+
+    private static IBrush CreateOverlayBackground(IBrush promptColor)
+    {
+        if (promptColor is ISolidColorBrush solid)
+        {
+            var c = solid.Color;
+            return new SolidColorBrush(Color.FromArgb(48, c.R, c.G, c.B));
+        }
+
+        return Brushes.Transparent;
     }
 
     private static IBrush ToNotificationColor(CoreService.DrawType type)
