@@ -44,9 +44,9 @@ namespace IslandCaller.Services.IslandCallerService
             };
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Simple",
-                args =>
+                async args =>
                 {
-                    NotificationProvider.RandomCall(1);
+                    await NotificationProvider.RandomCall(1);
                 }
             );
             uriNavigationService.HandlePluginsNavigation(

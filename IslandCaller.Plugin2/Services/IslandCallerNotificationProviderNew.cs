@@ -19,12 +19,14 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 {
     private readonly ILessonsService lessonsService = lessonsService;
 
-    public void RandomCall(int stunum)
+    public async Task RandomCall(int stunum)
     {
         if (stunum <= 0)
         {
             return;
         }
+
+        await ShowRollingAnimation();
 
         var selectedStudents = new List<CoreService.DrawResult>(stunum);
         for (int i = 0; i < stunum; i++)
@@ -55,6 +57,72 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
         // 多人抽取按顺序逐条弹出姓名。
         ShowChainedNotifications(requests);
+    }
+
+    private async Task ShowRollingAnimation()
+    {
+        var names = coreService.StudentNames.ToList();
+        if (names.Count == 0) return;
+
+        var random = new Random();
+        var startTime = DateTime.Now;
+        var duration = TimeSpan.FromSeconds(1.5);
+        var interval = 80;
+
+        while (DateTime.Now - startTime < duration)
+        {
+            var randomInd = random.Next(names.Count);
+            var rollingName = names[randomInd];
+
+            var request = BuildRollingRequest(rollingName);
+            ShowNotification(request);
+
+            await Task.Delay(interval);
+        }
+    }
+
+    private static NotificationRequest BuildRollingRequest(string name)
+    {
+        var promptColor = Brushes.Gray;
+        var overlayRoot = new Border
+        {
+            MinWidth = 240,
+            Padding = new Thickness(14, 8),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(2),
+            BorderBrush = promptColor,
+            Background = CreateOverlayBackground(promptColor),
+            Child = new TextBlock
+            {
+                Text = name,
+                Foreground = promptColor,
+                FontSize = 24,
+                FontWeight = FontWeight.SemiBold,
+                TextAlignment = TextAlignment.Center
+            }
+        };
+
+        return new NotificationRequest
+        {
+            MaskContent = NotificationContent.CreateTwoIconsMask("正在抽取...", factory: x =>
+            {
+                x.Duration = TimeSpan.FromMilliseconds(150);
+                x.IsSpeechEnabled = false;
+                x.Color = promptColor;
+            }),
+            OverlayContent = new NotificationContent(overlayRoot)
+            {
+                Duration = TimeSpan.FromMilliseconds(150),
+                Color = promptColor
+            },
+            RequestNotificationSettings =
+            {
+                IsSettingsEnabled = true,
+                IsNotificationEnabled = true,
+                IsNotificationEffectEnabled = true,
+                IsSpeechEnabled = false
+            }
+        };
     }
 
     private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)

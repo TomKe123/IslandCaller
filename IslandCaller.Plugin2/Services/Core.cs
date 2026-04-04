@@ -33,6 +33,8 @@ namespace IslandCaller.Services
         // 计算学生被点名的权重
         internal List<Person> Persons { get; set; } = new List<Person>();
 
+        public IEnumerable<string> StudentNames => Persons.Select(p => p.Name);
+
         internal void InitializeCore()
         {
             status.IsTimeStatusAvailable = false;
