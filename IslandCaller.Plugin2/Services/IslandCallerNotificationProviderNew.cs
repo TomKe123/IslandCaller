@@ -3,8 +3,6 @@ using ClassIsland.Core.Abstractions.Services.NotificationProviders;
 using ClassIsland.Core.Attributes;
 using ClassIsland.Core.Models.Notification;
 using ClassIsland.Shared.Enums;
-using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
 using IslandCaller.Models;
 
@@ -59,47 +57,17 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
     private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)
     {
-        var titleRoot = new Border
-        {
-            MinWidth = 220,
-            Padding = new Thickness(14, 8),
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(1),
-            BorderBrush = promptColor,
-            Background = promptColor,
-            Child = new TextBlock
-            {
-                Text = name,
-                Foreground = GetTitleForeground(promptColor),
-                FontSize = 22,
-                FontWeight = FontWeight.SemiBold,
-                TextAlignment = TextAlignment.Center
-            }
-        };
-
         return new NotificationRequest
         {
-            // 仅显示标题（Mask），不显示正文（Overlay）。
-            MaskContent = new NotificationContent(titleRoot)
+            // 仅使用 ClassIsland 原生模板，避免自定义额外遮罩控件。
+            MaskContent = NotificationContent.CreateTwoIconsMask(name, factory: x =>
             {
-                Duration = TimeSpan.FromSeconds(2),
-                IsSpeechEnabled = true,
-                SpeechContent = name,
-                Color = promptColor
-            }
+                x.Duration = TimeSpan.FromSeconds(2);
+                x.IsSpeechEnabled = true;
+                x.SpeechContent = name;
+                x.Color = promptColor;
+            })
         };
-    }
-
-    private static IBrush GetTitleForeground(IBrush background)
-    {
-        if (background is not ISolidColorBrush solid)
-        {
-            return Brushes.White;
-        }
-
-        var c = solid.Color;
-        double luminance = (0.299 * c.R) + (0.587 * c.G) + (0.114 * c.B);
-        return luminance > 150 ? Brushes.Black : Brushes.White;
     }
 
     private static IBrush ToNotificationColor(CoreService.DrawType type)
