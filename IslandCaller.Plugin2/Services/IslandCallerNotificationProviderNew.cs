@@ -66,7 +66,15 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
                 x.IsSpeechEnabled = true;
                 x.SpeechContent = name;
                 x.Color = promptColor;
-            })
+            }),
+            // 强制启用此次提醒的原生特效，确保 Color 能在主屏幕遮罩效果上生效。
+            RequestNotificationSettings =
+            {
+                IsSettingsEnabled = true,
+                IsNotificationEnabled = true,
+                IsNotificationEffectEnabled = true,
+                IsSpeechEnabled = true
+            }
         };
     }
 
