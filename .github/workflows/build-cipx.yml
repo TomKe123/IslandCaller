@@ -64,7 +64,8 @@ jobs:
           }
 
           $relativePaths = $cipxFiles | ForEach-Object {
-            (Resolve-Path -Path $_.FullName -Relative).TrimStart('.','/','\\').Replace('\\', '/')
+            $relativePath = (Resolve-Path -Path $_.FullName -Relative) -replace '\\', '/'
+            $relativePath.TrimStart('.', '/')
           }
 
           "files<<EOF" >> $env:GITHUB_OUTPUT
