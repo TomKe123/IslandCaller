@@ -12,6 +12,16 @@ namespace IslandCaller.Services
         private readonly ILogger<CoreService> logger = logger;
         private readonly Status status = status;
         private const double MaxPacerWeightBoost = 1.15;
+
+        internal enum DrawType
+        {
+            Normal,
+            Pacer,
+            Guarantee
+        }
+
+        internal readonly record struct DrawResult(string Name, DrawType Type);
+
         internal class Person
         {
             internal int Id { get; set; }
@@ -138,8 +148,20 @@ namespace IslandCaller.Services
 
         internal string GetRandomStudent()
         {
+            return GetRandomStudentResult().Name;
+        }
+
+        internal DrawResult GetRandomStudentResult()
+        {
             int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
             var guaranteeWeightMap = LoadGuaranteeWeightMap();
+            var pacerNameSet = Settings.Instance.General.EnableGuarantee
+                ? LoadPacerNameSet()
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (guaranteeWeightMap.Count > 0)
+            {
+                pacerNameSet.ExceptWith(guaranteeWeightMap.Keys);
+            }
 
             var guaranteed = GetGuaranteedCandidate();
             if (guaranteed != null)
@@ -149,22 +171,22 @@ namespace IslandCaller.Services
                 RestartGuaranteeCycleIfEarlyHit(guaranteed.Name, guaranteeWeightMap, threshold, sessionMissBeforeHit);
                 logger.LogTrace("保底命中：{Name}, SessionMiss={SessionMiss}", guaranteed.Name, historyService.GetSessionMissCount(guaranteed.Name));
                 ComputeWeightsForAllStudents();
-                return guaranteed.Name;
+                return new DrawResult(guaranteed.Name, DrawType.Guarantee);
             }
 
-            var pacerGuaranteed = GetPacerGuaranteedCandidate(guaranteeWeightMap);
+            var pacerGuaranteed = GetPacerGuaranteedCandidate(pacerNameSet);
             if (pacerGuaranteed != null)
             {
                 historyService.Add(pacerGuaranteed.Name);
                 logger.LogTrace("陪跑保底命中：{Name}, SessionMiss={SessionMiss}", pacerGuaranteed.Name, historyService.GetSessionMissCount(pacerGuaranteed.Name));
                 ComputeWeightsForAllStudents();
-                return pacerGuaranteed.Name;
+                return new DrawResult(pacerGuaranteed.Name, DrawType.Pacer);
             }
 
             // 计算权重总和
             double totalWeight = Persons.Sum(p => p.Weight);
             logger.LogTrace($"计算权重总和: {totalWeight}");
-            if (totalWeight <= 0) return "Error"; // 避免除以零
+            if (totalWeight <= 0) return new DrawResult("Error", DrawType.Normal); // 避免除以零
             // 生成一个 [0, totalWeight) 的随机数
             double r = GetTrueRandomDouble() * totalWeight;
             logger.LogTrace($"生成随机数: {r} (范围: [0, {totalWeight}))");
@@ -180,11 +202,27 @@ namespace IslandCaller.Services
                     RestartGuaranteeCycleIfEarlyHit(person.Name, guaranteeWeightMap, threshold, sessionMissBeforeHit);
                     logger.LogTrace($"抽取到学生：{person.Name}");
                     ComputeWeightsForAllStudents();
-                    return person.Name;
+                    DrawType type = GetDrawType(person.Name, guaranteeWeightMap, pacerNameSet);
+                    return new DrawResult(person.Name, type);
                 }
             }
             logger.LogWarning($"随机选择学生时发生了意外情况，权重总和: {totalWeight}, 随机数: {r}");
-            return "Error"; // 理论上不应该到达这里
+            return new DrawResult("Error", DrawType.Normal); // 理论上不应该到达这里
+        }
+
+        private static DrawType GetDrawType(string name, Dictionary<string, double> guaranteeWeightMap, HashSet<string> pacerNameSet)
+        {
+            if (guaranteeWeightMap.ContainsKey(name))
+            {
+                return DrawType.Guarantee;
+            }
+
+            if (pacerNameSet.Contains(name))
+            {
+                return DrawType.Pacer;
+            }
+
+            return DrawType.Normal;
         }
 
         private Person? GetGuaranteedCandidate()
@@ -235,7 +273,7 @@ namespace IslandCaller.Services
             return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
         }
 
-        private Person? GetPacerGuaranteedCandidate(Dictionary<string, double> guaranteeWeightMap)
+        private Person? GetPacerGuaranteedCandidate(HashSet<string> pacerNames)
         {
             if (!Settings.Instance.General.EnableGuarantee)
             {
@@ -243,17 +281,6 @@ namespace IslandCaller.Services
             }
 
             int pacerThreshold = Math.Max(1, Settings.Instance.General.PacerThreshold);
-            var pacerNames = LoadPacerNameSet();
-            if (pacerNames.Count == 0)
-            {
-                return null;
-            }
-
-            if (guaranteeWeightMap.Count > 0)
-            {
-                pacerNames.ExceptWith(guaranteeWeightMap.Keys);
-            }
-
             if (pacerNames.Count == 0)
             {
                 return null;
