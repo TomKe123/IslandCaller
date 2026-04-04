@@ -43,10 +43,8 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             return;
         }
 
-        var dominantType = ResolveDominantType(selectedStudents);
-        var promptColor = ToNotificationColor(dominantType);
         var requests = selectedStudents
-            .Select(x => BuildSingleNameRequest(x.Name, promptColor))
+            .Select(x => BuildSingleNameRequest(x.Name, ToNotificationColor(x.Type)))
             .ToArray();
 
         if (requests.Length == 1)
@@ -61,18 +59,18 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
     private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)
     {
-        var overlayRoot = new Border
+        var titleRoot = new Border
         {
             MinWidth = 220,
             Padding = new Thickness(14, 8),
             CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(2),
+            BorderThickness = new Thickness(1),
             BorderBrush = promptColor,
-            Background = CreateOverlayBackground(promptColor),
+            Background = promptColor,
             Child = new TextBlock
             {
                 Text = name,
-                Foreground = promptColor,
+                Foreground = GetTitleForeground(promptColor),
                 FontSize = 22,
                 FontWeight = FontWeight.SemiBold,
                 TextAlignment = TextAlignment.Center
@@ -81,45 +79,27 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
 
         return new NotificationRequest
         {
-            MaskContent = NotificationContent.CreateTwoIconsMask(name, factory: x =>
-            {
-                x.Duration = TimeSpan.FromSeconds(2);
-                x.IsSpeechEnabled = true;
-                x.SpeechContent = name;
-                x.Color = promptColor;
-            }),
-            OverlayContent = new NotificationContent(overlayRoot)
+            // 仅显示标题（Mask），不显示正文（Overlay）。
+            MaskContent = new NotificationContent(titleRoot)
             {
                 Duration = TimeSpan.FromSeconds(2),
+                IsSpeechEnabled = true,
+                SpeechContent = name,
                 Color = promptColor
             }
         };
     }
 
-    private static IBrush CreateOverlayBackground(IBrush promptColor)
+    private static IBrush GetTitleForeground(IBrush background)
     {
-        if (promptColor is ISolidColorBrush solid)
+        if (background is not ISolidColorBrush solid)
         {
-            var c = solid.Color;
-            return new SolidColorBrush(Color.FromArgb(40, c.R, c.G, c.B));
+            return Brushes.White;
         }
 
-        return Brushes.Transparent;
-    }
-
-    private static CoreService.DrawType ResolveDominantType(IEnumerable<CoreService.DrawResult> results)
-    {
-        if (results.Any(x => x.Type == CoreService.DrawType.Guarantee))
-        {
-            return CoreService.DrawType.Guarantee;
-        }
-
-        if (results.Any(x => x.Type == CoreService.DrawType.Pacer))
-        {
-            return CoreService.DrawType.Pacer;
-        }
-
-        return CoreService.DrawType.Normal;
+        var c = solid.Color;
+        double luminance = (0.299 * c.R) + (0.587 * c.G) + (0.114 * c.B);
+        return luminance > 150 ? Brushes.Black : Brushes.White;
     }
 
     private static IBrush ToNotificationColor(CoreService.DrawType type)
