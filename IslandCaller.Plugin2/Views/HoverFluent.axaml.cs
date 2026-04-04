@@ -14,10 +14,10 @@ public partial class HoverFluent : Window
     private bool _isDragging;
     private long _lastPositionLogTime;
     private const int PositionLogIntervalMs = 200;
-    private ILogger<HoverFluent>? logger;
-    private IslandCallerService? IslandCallerService;
-    private WindowTopmostHelper? windowTopmostHelper;
-    private WindowDragHelper? windowDragHelper;
+    private ILogger<HoverFluent> logger;
+    private IslandCallerService IslandCallerService;
+    private WindowTopmostHelper windowTopmostHelper;
+    private WindowDragHelper windowDragHelper;
     private CancellationTokenSource? topmostCts;
 
     public HoverFluent()
@@ -33,6 +33,12 @@ public partial class HoverFluent : Window
     {
         base.OnOpened(e);
         vm = DataContext as HoverFluentViewModel;
+        if (vm == null)
+        {
+            logger.LogWarning("HoverFluent DataContext 不是 HoverFluentViewModel，跳过窗口初始化。");
+            return;
+        }
+
         scaling = RenderScaling;
         Position = new PixelPoint((int)Math.Round(vm.PositionX * scaling), (int)Math.Round(vm.PositionY * scaling));
         PositionChanged += OnPositionChanged;
@@ -175,6 +181,11 @@ public partial class HoverFluent : Window
 
     private void UpdateViewModelPosition(int x, int y)
     {
+        if (vm == null)
+        {
+            return;
+        }
+
         vm.PositionX = x / scaling;
         vm.PositionY = y / scaling;
     }

@@ -15,7 +15,7 @@ public partial class HoverFluentControl : UserControl
 {
     private IslandCallerService IslandCallerService { get; }
     private Window? parentwindow { get; set; }
-    private ILogger<HoverFluentControl>? logger { get; set; }
+    private ILogger<HoverFluentControl> logger { get; set; }
     public PixelPoint lastWindowPosition { get; set; }
     private WindowDragHelper windowDragHelper { get; set; }
     private long _lastDragTime;

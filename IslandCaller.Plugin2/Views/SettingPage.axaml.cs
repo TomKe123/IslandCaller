@@ -14,6 +14,7 @@ using IslandCaller.Helpers;
 using IslandCaller.Services;
 using IslandCaller.ViewModels;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.ObjectModel;
 using System.Threading;
 using static IslandCaller.Services.ProfileService;
@@ -33,7 +34,7 @@ public partial class SettingPage : SettingsPageBase
 
     private SettingPageViewModel? vm;
     private HistoryService HistoryService;
-    private ILogger<SettingPage> logger;
+    private ILogger<SettingPage> logger = NullLogger<SettingPage>.Instance;
     private HotkeyBindingTarget _bindingTarget = HotkeyBindingTarget.None;
     private const int HotkeyBindingTimeoutMs = 2500;
     private const int HotkeySequenceCollectMs = 500;
@@ -47,7 +48,7 @@ public partial class SettingPage : SettingsPageBase
         InitializeComponent();
         vm = this.DataContext as SettingPageViewModel;
         HistoryService = IAppHost.GetService<HistoryService>();
-        logger = IAppHost.TryGetService<ILogger<SettingPage>>();
+        logger = IAppHost.TryGetService<ILogger<SettingPage>>() ?? NullLogger<SettingPage>.Instance;
         AddHandler(InputElement.KeyDownEvent, HotkeyCapture_OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(InputElement.KeyUpEvent, HotkeyCapture_OnKeyUp, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerPressedEvent, HotkeyCapture_OnPointerPressed, RoutingStrategies.Tunnel);
@@ -74,6 +75,7 @@ public partial class SettingPage : SettingsPageBase
 
     private void AddGuaranteeMemberButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (vm == null) return;
         var profileService = IAppHost.GetService<ProfileService>();
         vm.AddGuaranteeMember(profileService);
     }
