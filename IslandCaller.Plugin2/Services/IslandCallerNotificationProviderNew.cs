@@ -41,46 +41,27 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             return;
         }
 
-        var output = string.Join("  ", selectedStudents.Select(FormatTypedName));
-        var speechOutput = string.Join("  ", selectedStudents.Select(x => x.Name));
-        var dominantType = ResolveDominantType(selectedStudents);
-        var themeColor = ToNotificationColor(dominantType);
-        int maskduration = selectedStudents.Count * 2 + 1; // 计算持续时间
-        ShowNotification(new NotificationRequest()
-        {
-            MaskContent = NotificationContent.CreateTwoIconsMask(output, factory: x =>
+        var requests = selectedStudents
+            .Select(result => new NotificationRequest
             {
-                x.Duration = new TimeSpan(0, 0, maskduration);
-                x.IsSpeechEnabled = true;
-                x.SpeechContent = speechOutput;
-                x.Color = themeColor;
+                MaskContent = NotificationContent.CreateTwoIconsMask(result.Name, factory: x =>
+                {
+                    x.Duration = TimeSpan.FromSeconds(2);
+                    x.IsSpeechEnabled = true;
+                    x.SpeechContent = result.Name;
+                    // 使用 ClassIsland 的通知强调动画颜色字段，而不是文本 emoji。
+                    x.Color = ToNotificationColor(result.Type);
+                })
             })
-        });
-    }
+            .ToArray();
 
-    private static string FormatTypedName(CoreService.DrawResult result)
-    {
-        return result.Type switch
+        if (requests.Length == 1)
         {
-            CoreService.DrawType.Guarantee => $"🟨{result.Name}",
-            CoreService.DrawType.Pacer => $"🟪{result.Name}",
-            _ => $"🟦{result.Name}"
-        };
-    }
-
-    private static CoreService.DrawType ResolveDominantType(List<CoreService.DrawResult> results)
-    {
-        if (results.Any(x => x.Type == CoreService.DrawType.Guarantee))
-        {
-            return CoreService.DrawType.Guarantee;
+            ShowNotification(requests[0]);
+            return;
         }
 
-        if (results.Any(x => x.Type == CoreService.DrawType.Pacer))
-        {
-            return CoreService.DrawType.Pacer;
-        }
-
-        return CoreService.DrawType.Normal;
+        ShowChainedNotifications(requests);
     }
 
     private static IBrush ToNotificationColor(CoreService.DrawType type)
