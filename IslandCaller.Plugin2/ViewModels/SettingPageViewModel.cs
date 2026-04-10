@@ -359,7 +359,7 @@ namespace IslandCaller.ViewModels
             get => _profileList;
             set => this.RaiseAndSetIfChanged(ref _profileList, value);
         }
-        public IReadOnlyList<int> RarityOptions { get; } = [3, 4, 5];
+        public IReadOnlyList<int> RarityOptions { get; } = [3, 5];
         public ICommand RowCommand => new RelayCommand<StudentModel>(row =>
         {
             if (row == null) return;
@@ -678,14 +678,12 @@ namespace IslandCaller.ViewModels
             StatisticsList.Clear();
             StatisticsList.Add(new StatisticsItem { Metric = "总点名次数（长期）", Value = totalLongTerm.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "全班长期平均点名次数", Value = average.ToString("F2") });
-            StatisticsList.Add(new StatisticsItem { Metric = "保底状态", Value = IsGuaranteeEnabled ? "开启" : "关闭" });
-            StatisticsList.Add(new StatisticsItem { Metric = "保底阈值", Value = Math.Max(1, GuaranteeThreshold).ToString() });
-            StatisticsList.Add(new StatisticsItem { Metric = "陪跑保底阈值", Value = Math.Max(1, PacerThreshold).ToString() });
-            StatisticsList.Add(new StatisticsItem { Metric = "角色池模式", Value = IsGachaEnabled ? "开启" : "关闭" });
+            StatisticsList.Add(new StatisticsItem { Metric = "保底模式", Value = IsGachaEnabled ? "开启" : "关闭" });
             StatisticsList.Add(new StatisticsItem { Metric = "五星水位", Value = pityState.FiveStarPity.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "四星水位", Value = pityState.FourStarPity.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "五星大保底", Value = pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否" });
             StatisticsList.Add(new StatisticsItem { Metric = "四星大保底", Value = pityState.IsFourStarFeaturedGuaranteed ? "是" : "否" });
+            StatisticsList.Add(new StatisticsItem { Metric = "捕获明光次数", Value = pityState.CapturedRadianceCount.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "当前名单人数", Value = (ProfileList?.Count ?? 0).ToString() });
 
             RecentCallList.Clear();
@@ -704,16 +702,17 @@ namespace IslandCaller.ViewModels
         {
             var pityState = historyService.GetGachaPityState();
             int fiveStarCount = ProfileList.Count(x => x.Rarity == 5);
-            int fourStarCount = ProfileList.Count(x => x.Rarity == 4);
-            int threeStarCount = ProfileList.Count(x => x.Rarity == 3);
-            int featuredFiveStarCount = ProfileList.Count(x => x.Rarity == 5 && x.IsFeatured);
-            int featuredFourStarCount = ProfileList.Count(x => x.Rarity == 4 && x.IsFeatured);
+            int nonFiveStarCount = ProfileList.Count - fiveStarCount;
+            string featuredFiveStar = string.IsNullOrWhiteSpace(pityState.FeaturedFiveStarName) ? "未生成" : pityState.FeaturedFiveStarName;
+            string featuredFourStars = pityState.FeaturedFourStarNames.Count == 0 ? "未生成" : string.Join("、", pityState.FeaturedFourStarNames);
 
             GachaSummaryText =
-                $"角色池模式：{(IsGachaEnabled ? "开启" : "关闭")}；" +
-                $"3星={threeStarCount}，4星={fourStarCount}（UP {featuredFourStarCount}），5星={fiveStarCount}（UP {featuredFiveStarCount}）；" +
+                $"保底模式：{(IsGachaEnabled ? "开启" : "关闭")}；" +
+                $"五星候选 {fiveStarCount} 人，非五星 {nonFiveStarCount} 人；" +
+                $"今日五星 UP：{featuredFiveStar}；今日四星 UP：{featuredFourStars}；" +
                 $"当前水位：五星 {pityState.FiveStarPity}/{Math.Max(1, FiveStarHardPity)}，四星 {pityState.FourStarPity}/{Math.Max(1, FourStarHardPity)}；" +
-                $"五星大保底={(pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否")}，四星大保底={(pityState.IsFourStarFeaturedGuaranteed ? "是" : "否")}。";
+                $"五星大保底={(pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否")}，四星大保底={(pityState.IsFourStarFeaturedGuaranteed ? "是" : "否")}；" +
+                $"五星小保底歪后额外有 {0.1:P0} 概率触发捕获明光，累计触发 {pityState.CapturedRadianceCount} 次。";
         }
 
         private void UpdateGuaranteeSummary(ProfileService profileService)

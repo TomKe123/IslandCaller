@@ -250,7 +250,11 @@ namespace IslandCaller.Services
                 FourStarPity = gachaPityState.FourStarPity,
                 IsFiveStarFeaturedGuaranteed = gachaPityState.IsFiveStarFeaturedGuaranteed,
                 IsFourStarFeaturedGuaranteed = gachaPityState.IsFourStarFeaturedGuaranteed,
-                TotalDrawCount = gachaPityState.TotalDrawCount
+                CapturedRadianceCount = gachaPityState.CapturedRadianceCount,
+                TotalDrawCount = gachaPityState.TotalDrawCount,
+                BannerDate = gachaPityState.BannerDate,
+                FeaturedFiveStarName = gachaPityState.FeaturedFiveStarName,
+                FeaturedFourStarNames = [.. gachaPityState.FeaturedFourStarNames]
             };
         }
 
@@ -262,7 +266,15 @@ namespace IslandCaller.Services
                 FourStarPity = Math.Max(0, state.FourStarPity),
                 IsFiveStarFeaturedGuaranteed = state.IsFiveStarFeaturedGuaranteed,
                 IsFourStarFeaturedGuaranteed = state.IsFourStarFeaturedGuaranteed,
-                TotalDrawCount = Math.Max(0, state.TotalDrawCount)
+                CapturedRadianceCount = Math.Max(0, state.CapturedRadianceCount),
+                TotalDrawCount = Math.Max(0, state.TotalDrawCount),
+                BannerDate = state.BannerDate ?? string.Empty,
+                FeaturedFiveStarName = state.FeaturedFiveStarName ?? string.Empty,
+                FeaturedFourStarNames = state.FeaturedFourStarNames?
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList() ?? []
             };
             SaveGachaState(Settings.Instance.Profile.DefaultProfile);
         }

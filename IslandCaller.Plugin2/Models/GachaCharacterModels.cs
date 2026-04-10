@@ -13,6 +13,10 @@ namespace IslandCaller.Models
         public int FourStarPity { get; set; }
         public bool IsFiveStarFeaturedGuaranteed { get; set; }
         public bool IsFourStarFeaturedGuaranteed { get; set; }
+        public int CapturedRadianceCount { get; set; }
         public int TotalDrawCount { get; set; }
+        public string BannerDate { get; set; } = string.Empty;
+        public string FeaturedFiveStarName { get; set; } = string.Empty;
+        public List<string> FeaturedFourStarNames { get; set; } = [];
     }
 }
