@@ -345,15 +345,20 @@ namespace IslandCaller.Services
                 return settingsSnapshot;
             }
 
-            var guaranteeWeights = ParseGuaranteeWeightMap();
-            var pacerNames = ParsePacerNameSet();
-            if (guaranteeWeights.Count > 0)
+            bool enableGuarantee = Settings.Instance.General.EnableGuarantee;
+            var guaranteeWeights = enableGuarantee
+                ? ParseGuaranteeWeightMap()
+                : new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            var pacerNames = enableGuarantee
+                ? ParsePacerNameSet()
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (enableGuarantee && guaranteeWeights.Count > 0)
             {
                 pacerNames.ExceptWith(guaranteeWeights.Keys);
             }
 
             settingsSnapshot = new GeneralSettingsSnapshot(
-                Settings.Instance.General.EnableGuarantee,
+                enableGuarantee,
                 Math.Max(1, Settings.Instance.General.GuaranteeThreshold),
                 Math.Max(1, Settings.Instance.General.PacerThreshold),
                 guaranteeWeights,
