@@ -13,12 +13,14 @@ namespace IslandCaller.Services
             public int LastCallIndex { get; set; }
         }
 
-        private Dictionary<string, int> historyDict = new();
-        private List<string> top20List = new();
-        private Dictionary<string, int> sessionMissCount = new();
-        private int sessionCallCount = 0;
-        private ProfileService profileService = profileService;
-        private Status Status = status;
+        private readonly Dictionary<string, int> historyDict = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> top20List = [];
+        private readonly Dictionary<string, int> recentCallIndex = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int> lastSessionHitCallCount = new(StringComparer.OrdinalIgnoreCase);
+        private int sessionCallCount;
+        private int totalLongTermCallCount;
+        private readonly ProfileService profileService = profileService;
+        private readonly Status Status = status;
 
         private string GetBasePath()
         {
@@ -39,13 +41,16 @@ namespace IslandCaller.Services
         {
             Status.HistoryServiceInitialized = false;
             historyDict.Clear();
-            sessionMissCount.Clear();
+            recentCallIndex.Clear();
+            lastSessionHitCallCount.Clear();
+            top20List.Clear();
             sessionCallCount = 0;
+            totalLongTermCallCount = 0;
 
             string filePath = GetFilePath(guid);
 
             // 先构建一个 name → count 的临时字典，用于快速查找
-            var csvDict = new Dictionary<string, int>();
+            var csvDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             if (File.Exists(filePath))
             {
@@ -76,13 +81,14 @@ namespace IslandCaller.Services
                 if (csvDict.TryGetValue(name, out int count))
                 {
                     historyDict[name] = count;   // CSV 有 → 用 CSV 的值
+                    totalLongTermCallCount += count;
                 }
                 else
                 {
                     historyDict[name] = 0;       // CSV 没有 → 记为 0
                 }
 
-                sessionMissCount[name] = 0;
+                lastSessionHitCallCount[name] = 0;
             }
             Status.HistoryServiceInitialized = true;
         }
@@ -94,26 +100,23 @@ namespace IslandCaller.Services
                 return;
 
             EnsureMemberCounters();
+            string normalizedName = name.Trim();
 
             // 1️ 更新 Dictionary（统计次数）
-            if (historyDict.ContainsKey(name))
-                historyDict[name]++;
+            if (historyDict.ContainsKey(normalizedName))
+                historyDict[normalizedName]++;
             else
-                historyDict[name] = 1;
-
-            foreach (var key in sessionMissCount.Keys.ToList())
-            {
-                sessionMissCount[key]++;
-            }
-
-            sessionMissCount[name] = 0;
+                historyDict[normalizedName] = 1;
+            totalLongTermCallCount++;
 
             // 2️ 更新 top20（允许重复）
-            top20List.Insert(0, name);
             sessionCallCount++;
+            lastSessionHitCallCount[normalizedName] = sessionCallCount;
+            top20List.Insert(0, normalizedName);
 
             if (top20List.Count > 20)
                 top20List.RemoveAt(top20List.Count - 1);
+            RebuildRecentCallIndex();
 
             // 3️自动保存
             Guid guid = Settings.Instance.Profile.DefaultProfile;
@@ -152,14 +155,14 @@ namespace IslandCaller.Services
         // 不存在返回 -1
         public int GetLastCallIndex(string name)
         {
-            int index = top20List.IndexOf(name);
-            return index;
+            return recentCallIndex.TryGetValue(name, out int index) ? index : -1;
         }
 
         public int GetSessionMissCount(string name)
         {
-            if (sessionMissCount.TryGetValue(name, out int count))
-                return count;
+            EnsureMemberCounters();
+            if (lastSessionHitCallCount.TryGetValue(name, out int lastHit))
+                return sessionCallCount - lastHit;
 
             return 0;
         }
@@ -181,9 +184,9 @@ namespace IslandCaller.Services
                 }
 
                 var key = name.Trim();
-                if (sessionMissCount.ContainsKey(key))
+                if (lastSessionHitCallCount.ContainsKey(key))
                 {
-                    sessionMissCount[key] = 0;
+                    lastSessionHitCallCount[key] = sessionCallCount;
                 }
             }
         }
@@ -193,13 +196,14 @@ namespace IslandCaller.Services
         {
             if (historyDict.Count == 0)
                 return 0;
-            return historyDict.Values.Average();
+            return (double)totalLongTermCallCount / historyDict.Count;
         }
 
         // 清空长期记录
         public void ClearLongTermHistory()
         {
             historyDict.Clear();
+            totalLongTermCallCount = 0;
             foreach (var name in profileService.Members.Select(x => x.Name))
             {
                 historyDict[name] = 0;
@@ -211,11 +215,12 @@ namespace IslandCaller.Services
         public void ClearThisLessonHistory()
         {
             top20List.Clear();
-            sessionMissCount.Clear();
+            recentCallIndex.Clear();
+            lastSessionHitCallCount.Clear();
             sessionCallCount = 0;
             foreach (var name in profileService.Members.Select(x => x.Name))
             {
-                sessionMissCount[name] = 0;
+                lastSessionHitCallCount[name] = 0;
             }
         }
 
@@ -237,7 +242,7 @@ namespace IslandCaller.Services
 
         public int GetTotalLongTermCallCount()
         {
-            return historyDict.Values.Sum();
+            return totalLongTermCallCount;
         }
 
         public IReadOnlyList<string> GetRecentCalls(int count)
@@ -257,9 +262,22 @@ namespace IslandCaller.Services
                     historyDict[member.Name] = 0;
                 }
 
-                if (!sessionMissCount.ContainsKey(member.Name))
+                if (!lastSessionHitCallCount.ContainsKey(member.Name))
                 {
-                    sessionMissCount[member.Name] = 0;
+                    lastSessionHitCallCount[member.Name] = 0;
+                }
+            }
+        }
+
+        private void RebuildRecentCallIndex()
+        {
+            recentCallIndex.Clear();
+            for (int i = 0; i < top20List.Count; i++)
+            {
+                string name = top20List[i];
+                if (!recentCallIndex.ContainsKey(name))
+                {
+                    recentCallIndex[name] = i;
                 }
             }
         }

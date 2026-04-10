@@ -1,17 +1,29 @@
-﻿using Microsoft.Extensions.Logging;
-using IslandCaller.Models;
-using System.Text.Json;
+using System.ComponentModel;
 using System.Security.Cryptography;
+using System.Text.Json;
+using IslandCaller.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IslandCaller.Services
 {
-    public class CoreService(ProfileService profileService, HistoryService historyService, ILogger<CoreService> logger, Status status)
+    public class CoreService
     {
-        private readonly ProfileService profileService = profileService;
-        private readonly HistoryService historyService = historyService;
-        private readonly ILogger<CoreService> logger = logger;
-        private readonly Status status = status;
+        private readonly ProfileService profileService;
+        private readonly HistoryService historyService;
+        private readonly ILogger<CoreService> logger;
+        private readonly Status status;
         private const double MaxPacerWeightBoost = 1.15;
+        private bool settingsCacheDirty = true;
+        private GeneralSettingsSnapshot settingsSnapshot = GeneralSettingsSnapshot.Empty;
+
+        public CoreService(ProfileService profileService, HistoryService historyService, ILogger<CoreService> logger, Status status)
+        {
+            this.profileService = profileService;
+            this.historyService = historyService;
+            this.logger = logger;
+            this.status = status;
+            Settings.Instance.General.PropertyChanged += OnGeneralSettingsChanged;
+        }
 
         internal enum DrawType
         {
@@ -26,12 +38,13 @@ namespace IslandCaller.Services
         {
             internal int Id { get; set; }
             internal string Name { get; set; } = string.Empty;
+            internal string NormalizedName { get; set; } = string.Empty;
             internal int Gender { get; set; }
-            internal double ManualWeight { get; set; } = 1.0; // 教师设置的基础权重，默认为 1.0
+            internal double ManualWeight { get; set; } = 1.0;
             internal double Weight { get; set; }
         }
-        // 计算学生被点名的权重
-        internal List<Person> Persons { get; set; } = new List<Person>();
+
+        internal List<Person> Persons { get; } = [];
 
         public IEnumerable<string> StudentNames => Persons.Select(p => p.Name);
 
@@ -46,106 +59,82 @@ namespace IslandCaller.Services
                 {
                     Id = person.Id,
                     Name = person.Name,
+                    NormalizedName = NormalizeName(person.Name),
                     Gender = person.Gender,
                     ManualWeight = person.ManualWeight,
                     Weight = 0.0
                 });
             }
+
             ComputeWeightsForAllStudents();
             status.CoreServiceInitialized = true;
         }
 
-        private double ComputeSingleWeight(
-                                double manualWeight,     // W_manual_i
-                                int lastHitStep,         // s_i_last：该学生上次被点到的轮次（没点过可设为 -1）
-                                int nHist,               // n_hist_i：历史被点次数
-                                double avgHist)          // avg_hist：全班历史平均被点次数
+        private double ComputeSingleWeight(double manualWeight, int lastHitStep, int nHist, double avgHist)
         {
-            // -----------------------------
-            // 1. 本节课防重复因子（随时间恢复）
-            // -----------------------------
-            const double fMin = 0;     // 最低值
-            const double beta = 0.54;    // 恢复系数
+            const double fMin = 0;
+            const double beta = 0.54;
 
             int deltaS = lastHitStep;
-            if (deltaS < 0) deltaS = 15;
+            if (deltaS < 0)
+            {
+                deltaS = 15;
+            }
 
-            // F_session = 1 - (1 - fMin) * exp(-beta * Δs)
-            double F_session = 1 - (1 - fMin) * Math.Exp(-beta * deltaS);
+            double sessionFactor = 1 - (1 - fMin) * Math.Exp(-beta * deltaS);
 
-            // -----------------------------
-            // 2. 历史均衡因子
-            // -----------------------------
-            const double eps = 1.0;      // 平滑项
-            const double gamma = 0.9;    // 补偿强度
-            const double rMin = 0.6;     // 最小补偿
-            const double rMax = 1.6;     // 最大补偿
+            const double eps = 1.0;
+            const double gamma = 0.9;
+            const double rMin = 0.6;
+            const double rMax = 1.6;
 
-            // F_history = clip( ((manualWeight * avgHist + eps)/(nHist + eps))^gamma , rMin, rMax )
             double ratio = (manualWeight * avgHist + eps) / (nHist + eps);
-            double F_history = Math.Pow(ratio, gamma);
-            F_history = Math.Max(rMin, Math.Min(rMax, F_history));
+            double historyFactor = Math.Pow(ratio, gamma);
+            historyFactor = Math.Max(rMin, Math.Min(rMax, historyFactor));
 
-            // -----------------------------
-            // 3. 最终权重
-            // -----------------------------
-            return manualWeight * F_session * F_history;
+            return manualWeight * sessionFactor * historyFactor;
         }
 
         private void ComputeWeightsForAllStudents()
         {
-            // 计算全班历史平均被点次数
             double avgHist = historyService.GetAverageLongTermCount();
-            var guaranteeWeights = Settings.Instance.General.EnableGuarantee
-                ? LoadGuaranteeWeightMap()
-                : new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-            double dynamicGuaranteeBoost = GetDynamicGuaranteeBoost();
-            bool enableGuarantee = Settings.Instance.General.EnableGuarantee;
-            var pacerNameSet = enableGuarantee
-                ? LoadPacerNameSet()
-                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            double dynamicPacerBoost = enableGuarantee ? GetDynamicPacerBoost() : 1.0;
-            logger.LogTrace($"计算全班历史平均被点次数: {avgHist}");
+            var settings = GetSettingsSnapshot();
+            double dynamicGuaranteeBoost = settings.EnableGuarantee ? GetDynamicGuaranteeBoost(settings.GuaranteeThreshold) : 1.0;
+            double dynamicPacerBoost = settings.EnableGuarantee ? GetDynamicPacerBoost(settings.PacerThreshold) : 1.0;
+
+            logger.LogTrace("计算全班历史平均被点次数: {Average}", avgHist);
             foreach (var person in Persons)
             {
-                string normalizedName = NormalizeName(person.Name);
                 int nHist = historyService.GetLongTermCount(person.Name);
                 int lastHitStep = historyService.GetLastCallIndex(person.Name);
-                double weight = ComputeSingleWeight(
-                                    person.ManualWeight,
-                                    lastHitStep,
-                                    nHist,
-                                    avgHist);
+                double weight = ComputeSingleWeight(person.ManualWeight, lastHitStep, nHist, avgHist);
 
-                if (guaranteeWeights.TryGetValue(normalizedName, out var guaranteeWeight))
+                if (settings.GuaranteeWeights.TryGetValue(person.NormalizedName, out var guaranteeWeight))
                 {
-                    weight *= Math.Max(0.01, guaranteeWeight) * dynamicGuaranteeBoost;
+                    weight *= guaranteeWeight * dynamicGuaranteeBoost;
                 }
-                else if (pacerNameSet.Contains(normalizedName))
+                else if (settings.PacerNames.Contains(person.NormalizedName))
                 {
                     weight *= dynamicPacerBoost;
                 }
 
                 person.Weight = weight;
-                logger.LogTrace($"计算权重 - 学生: {person.Name}, ManualWeight: {person.ManualWeight}, LastHitStep: {lastHitStep}, nHist: {nHist}, Weight: {weight}");
+                logger.LogTrace("计算权重 - 学生: {Name}, ManualWeight: {ManualWeight}, LastHitStep: {LastHitStep}, nHist: {HistoryCount}, Weight: {Weight}",
+                    person.Name, person.ManualWeight, lastHitStep, nHist, weight);
             }
         }
 
-        private double GetDynamicGuaranteeBoost()
+        private double GetDynamicGuaranteeBoost(int threshold)
         {
-            int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
             int sessionCallCount = historyService.GetSessionCallCount();
-            // 抽取次数越多，保底名单成员权重越大；在一个阈值周期后提升到 2 倍。
             double boost = 1.0 + (double)sessionCallCount / threshold;
             return Math.Min(4.0, boost);
         }
 
-        private double GetDynamicPacerBoost()
+        private double GetDynamicPacerBoost(int threshold)
         {
-            int threshold = Math.Max(1, Settings.Instance.General.PacerThreshold);
             int sessionCallCount = historyService.GetSessionCallCount();
             double progress = Math.Min(1.0, (double)sessionCallCount / threshold);
-            // 陪跑名单只做轻量提升，最高不超过 1.15 倍。
             return 1.0 + (MaxPacerWeightBoost - 1.0) * progress;
         }
 
@@ -156,28 +145,19 @@ namespace IslandCaller.Services
 
         internal DrawResult GetRandomStudentResult()
         {
-            int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
-            var guaranteeWeightMap = LoadGuaranteeWeightMap();
-            var pacerNameSet = Settings.Instance.General.EnableGuarantee
-                ? LoadPacerNameSet()
-                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (guaranteeWeightMap.Count > 0)
-            {
-                pacerNameSet.ExceptWith(guaranteeWeightMap.Keys);
-            }
-
-            var guaranteed = GetGuaranteedCandidate();
+            var settings = GetSettingsSnapshot();
+            var guaranteed = GetGuaranteedCandidate(settings);
             if (guaranteed != null)
             {
                 int sessionMissBeforeHit = historyService.GetSessionMissCount(guaranteed.Name);
                 historyService.Add(guaranteed.Name);
-                RestartGuaranteeCycleIfEarlyHit(guaranteed.Name, guaranteeWeightMap, threshold, sessionMissBeforeHit);
+                RestartGuaranteeCycleIfEarlyHit(guaranteed.Name, settings.GuaranteeWeights, settings.GuaranteeThreshold, sessionMissBeforeHit, settings.EnableGuarantee);
                 logger.LogTrace("保底命中：{Name}, SessionMiss={SessionMiss}", guaranteed.Name, historyService.GetSessionMissCount(guaranteed.Name));
                 ComputeWeightsForAllStudents();
                 return new DrawResult(guaranteed.Name, DrawType.Guarantee);
             }
 
-            var pacerGuaranteed = GetPacerGuaranteedCandidate(pacerNameSet);
+            var pacerGuaranteed = GetPacerGuaranteedCandidate(settings);
             if (pacerGuaranteed != null)
             {
                 historyService.Add(pacerGuaranteed.Name);
@@ -186,14 +166,16 @@ namespace IslandCaller.Services
                 return new DrawResult(pacerGuaranteed.Name, DrawType.Pacer);
             }
 
-            // 计算权重总和
             double totalWeight = Persons.Sum(p => p.Weight);
-            logger.LogTrace($"计算权重总和: {totalWeight}");
-            if (totalWeight <= 0) return new DrawResult("Error", DrawType.Normal); // 避免除以零
-            // 生成一个 [0, totalWeight) 的随机数
+            logger.LogTrace("计算权重总和: {TotalWeight}", totalWeight);
+            if (totalWeight <= 0)
+            {
+                return new DrawResult("Error", DrawType.Normal);
+            }
+
             double r = GetTrueRandomDouble() * totalWeight;
-            logger.LogTrace($"生成随机数: {r} (范围: [0, {totalWeight}))");
-            // 根据权重选择学生
+            logger.LogTrace("生成随机数: {Random} (范围: [0, {TotalWeight}))", r, totalWeight);
+
             double cumulative = 0;
             foreach (var person in Persons)
             {
@@ -202,21 +184,20 @@ namespace IslandCaller.Services
                 {
                     int sessionMissBeforeHit = historyService.GetSessionMissCount(person.Name);
                     historyService.Add(person.Name);
-                    RestartGuaranteeCycleIfEarlyHit(person.Name, guaranteeWeightMap, threshold, sessionMissBeforeHit);
-                    logger.LogTrace($"抽取到学生：{person.Name}");
+                    RestartGuaranteeCycleIfEarlyHit(person.Name, settings.GuaranteeWeights, settings.GuaranteeThreshold, sessionMissBeforeHit, settings.EnableGuarantee);
+                    logger.LogTrace("抽取到学生：{Name}", person.Name);
                     ComputeWeightsForAllStudents();
-                    DrawType type = GetDrawType(person.Name, guaranteeWeightMap, pacerNameSet);
+                    DrawType type = GetDrawType(person.NormalizedName, settings.GuaranteeWeights, settings.PacerNames);
                     return new DrawResult(person.Name, type);
                 }
             }
-            logger.LogWarning($"随机选择学生时发生了意外情况，权重总和: {totalWeight}, 随机数: {r}");
-            return new DrawResult("Error", DrawType.Normal); // 理论上不应该到达这里
+
+            logger.LogWarning("随机选择学生时发生了意外情况，权重总和: {TotalWeight}, 随机数: {Random}", totalWeight, r);
+            return new DrawResult("Error", DrawType.Normal);
         }
 
-        private static DrawType GetDrawType(string name, Dictionary<string, double> guaranteeWeightMap, HashSet<string> pacerNameSet)
+        private static DrawType GetDrawType(string normalizedName, Dictionary<string, double> guaranteeWeightMap, HashSet<string> pacerNameSet)
         {
-            string normalizedName = NormalizeName(name);
-
             if (guaranteeWeightMap.ContainsKey(normalizedName))
             {
                 return DrawType.Guarantee;
@@ -230,105 +211,94 @@ namespace IslandCaller.Services
             return DrawType.Normal;
         }
 
-        private Person? GetGuaranteedCandidate()
+        private Person? GetGuaranteedCandidate(GeneralSettingsSnapshot settings)
         {
-            if (!Settings.Instance.General.EnableGuarantee)
+            if (!settings.EnableGuarantee || settings.GuaranteeWeights.Count == 0)
             {
                 return null;
             }
 
-            int threshold = Math.Max(1, Settings.Instance.General.GuaranteeThreshold);
-            var guaranteeWeights = LoadGuaranteeWeightMap();
-            if (guaranteeWeights.Count == 0)
+            var candidates = new List<(Person Person, double Weight)>();
+            int maxMiss = -1;
+            double totalWeight = 0;
+
+            foreach (var person in Persons)
             {
-                return null;
-            }
-
-            var candidates = Persons
-                .Where(p => guaranteeWeights.ContainsKey(NormalizeName(p.Name)) && historyService.GetSessionMissCount(p.Name) >= threshold)
-                .ToList();
-
-            if (candidates.Count == 0)
-            {
-                return null;
-            }
-
-            int maxMiss = candidates.Max(c => historyService.GetSessionMissCount(c.Name));
-            var topMissCandidates = candidates
-                .Where(c => historyService.GetSessionMissCount(c.Name) == maxMiss)
-                .ToList();
-
-            double totalWeight = topMissCandidates.Sum(c => Math.Max(0.01, c.Weight * guaranteeWeights[NormalizeName(c.Name)]));
-            if (totalWeight <= 0)
-            {
-                return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
-            }
-
-            double r = GetTrueRandomDouble() * totalWeight;
-            double cumulative = 0;
-            foreach (var person in topMissCandidates)
-            {
-                cumulative += Math.Max(0.01, person.Weight * guaranteeWeights[NormalizeName(person.Name)]);
-                if (r < cumulative)
+                if (!settings.GuaranteeWeights.TryGetValue(person.NormalizedName, out var guaranteeWeight))
                 {
-                    return person;
+                    continue;
+                }
+
+                int missCount = historyService.GetSessionMissCount(person.Name);
+                if (missCount < settings.GuaranteeThreshold)
+                {
+                    continue;
+                }
+
+                double candidateWeight = Math.Max(0.01, person.Weight * guaranteeWeight);
+                if (missCount > maxMiss)
+                {
+                    maxMiss = missCount;
+                    totalWeight = 0;
+                    candidates.Clear();
+                }
+
+                if (missCount == maxMiss)
+                {
+                    candidates.Add((person, candidateWeight));
+                    totalWeight += candidateWeight;
                 }
             }
 
-            return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+            return PickCandidate(candidates, totalWeight);
         }
 
-        private Person? GetPacerGuaranteedCandidate(HashSet<string> pacerNames)
+        private Person? GetPacerGuaranteedCandidate(GeneralSettingsSnapshot settings)
         {
-            if (!Settings.Instance.General.EnableGuarantee)
+            if (!settings.EnableGuarantee || settings.PacerNames.Count == 0)
             {
                 return null;
             }
 
-            int pacerThreshold = Math.Max(1, Settings.Instance.General.PacerThreshold);
-            if (pacerNames.Count == 0)
+            var candidates = new List<(Person Person, double Weight)>();
+            int maxMiss = -1;
+            double totalWeight = 0;
+            double pacerBoost = GetDynamicPacerBoost(settings.PacerThreshold);
+
+            foreach (var person in Persons)
             {
-                return null;
-            }
-
-            var candidates = Persons
-                .Where(p => pacerNames.Contains(NormalizeName(p.Name)) && historyService.GetSessionMissCount(p.Name) >= pacerThreshold)
-                .ToList();
-
-            if (candidates.Count == 0)
-            {
-                return null;
-            }
-
-            int maxMiss = candidates.Max(c => historyService.GetSessionMissCount(c.Name));
-            var topMissCandidates = candidates
-                .Where(c => historyService.GetSessionMissCount(c.Name) == maxMiss)
-                .ToList();
-
-            double pacerBoost = GetDynamicPacerBoost();
-            double totalWeight = topMissCandidates.Sum(c => Math.Max(0.01, c.Weight * pacerBoost));
-            if (totalWeight <= 0)
-            {
-                return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
-            }
-
-            double r = GetTrueRandomDouble() * totalWeight;
-            double cumulative = 0;
-            foreach (var person in topMissCandidates)
-            {
-                cumulative += Math.Max(0.01, person.Weight * pacerBoost);
-                if (r < cumulative)
+                if (!settings.PacerNames.Contains(person.NormalizedName))
                 {
-                    return person;
+                    continue;
+                }
+
+                int missCount = historyService.GetSessionMissCount(person.Name);
+                if (missCount < settings.PacerThreshold)
+                {
+                    continue;
+                }
+
+                double candidateWeight = Math.Max(0.01, person.Weight * pacerBoost);
+                if (missCount > maxMiss)
+                {
+                    maxMiss = missCount;
+                    totalWeight = 0;
+                    candidates.Clear();
+                }
+
+                if (missCount == maxMiss)
+                {
+                    candidates.Add((person, candidateWeight));
+                    totalWeight += candidateWeight;
                 }
             }
 
-            return topMissCandidates.OrderBy(x => x.Id).FirstOrDefault();
+            return PickCandidate(candidates, totalWeight);
         }
 
-        private void RestartGuaranteeCycleIfEarlyHit(string selectedName, Dictionary<string, double> guaranteeWeightMap, int threshold, int? sessionMissBeforeHit = null)
+        private void RestartGuaranteeCycleIfEarlyHit(string selectedName, Dictionary<string, double> guaranteeWeightMap, int threshold, int? sessionMissBeforeHit, bool enableGuarantee)
         {
-            if (!Settings.Instance.General.EnableGuarantee || guaranteeWeightMap.Count == 0)
+            if (!enableGuarantee || guaranteeWeightMap.Count == 0)
             {
                 return;
             }
@@ -346,7 +316,7 @@ namespace IslandCaller.Services
             }
 
             var guaranteeRawNames = Persons
-                .Where(p => guaranteeWeightMap.ContainsKey(NormalizeName(p.Name)))
+                .Where(p => guaranteeWeightMap.ContainsKey(p.NormalizedName))
                 .Select(p => p.Name)
                 .ToList();
 
@@ -354,7 +324,45 @@ namespace IslandCaller.Services
             logger.LogTrace("保底提前触发后重置计数：{Name}, MissBeforeHit={MissBeforeHit}, Threshold={Threshold}", selectedName, missBeforeHit, threshold);
         }
 
-        private Dictionary<string, double> LoadGuaranteeWeightMap()
+        private void OnGeneralSettingsChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(GeneralSetting.EnableGuarantee)
+                or nameof(GeneralSetting.GuaranteeThreshold)
+                or nameof(GeneralSetting.GuaranteeListText)
+                or nameof(GeneralSetting.GuaranteeWeightListJson)
+                or nameof(GeneralSetting.PacerListJson)
+                or nameof(GeneralSetting.PacerThreshold))
+            {
+                settingsCacheDirty = true;
+                ComputeWeightsForAllStudents();
+            }
+        }
+
+        private GeneralSettingsSnapshot GetSettingsSnapshot()
+        {
+            if (!settingsCacheDirty)
+            {
+                return settingsSnapshot;
+            }
+
+            var guaranteeWeights = ParseGuaranteeWeightMap();
+            var pacerNames = ParsePacerNameSet();
+            if (guaranteeWeights.Count > 0)
+            {
+                pacerNames.ExceptWith(guaranteeWeights.Keys);
+            }
+
+            settingsSnapshot = new GeneralSettingsSnapshot(
+                Settings.Instance.General.EnableGuarantee,
+                Math.Max(1, Settings.Instance.General.GuaranteeThreshold),
+                Math.Max(1, Settings.Instance.General.PacerThreshold),
+                guaranteeWeights,
+                pacerNames);
+            settingsCacheDirty = false;
+            return settingsSnapshot;
+        }
+
+        private static Dictionary<string, double> ParseGuaranteeWeightMap()
         {
             try
             {
@@ -362,12 +370,13 @@ namespace IslandCaller.Services
                 var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
                 foreach (var item in items)
                 {
-                    if (string.IsNullOrWhiteSpace(item.Name))
+                    string normalizedName = NormalizeName(item.Name);
+                    if (string.IsNullOrWhiteSpace(normalizedName))
                     {
                         continue;
                     }
 
-                    result[item.Name.Trim()] = Math.Max(0.01, item.Weight);
+                    result[normalizedName] = Math.Max(0.01, item.Weight);
                 }
 
                 if (result.Count > 0)
@@ -384,7 +393,7 @@ namespace IslandCaller.Services
                 .ToDictionary(x => x, _ => 1.0, StringComparer.OrdinalIgnoreCase);
         }
 
-        private HashSet<string> LoadPacerNameSet()
+        private static HashSet<string> ParsePacerNameSet()
         {
             try
             {
@@ -400,7 +409,7 @@ namespace IslandCaller.Services
             }
         }
 
-        private class GuaranteeWeightItem
+        private sealed class GuaranteeWeightItem
         {
             public string Name { get; set; } = string.Empty;
             public double Weight { get; set; } = 1.0;
@@ -425,17 +434,49 @@ namespace IslandCaller.Services
             return rawName?.Trim() ?? string.Empty;
         }
 
+        private static Person? PickCandidate(List<(Person Person, double Weight)> candidates, double totalWeight)
+        {
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+
+            if (totalWeight <= 0)
+            {
+                return candidates.MinBy(x => x.Person.Id).Person;
+            }
+
+            double r = GetTrueRandomDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var candidate in candidates)
+            {
+                cumulative += candidate.Weight;
+                if (r < cumulative)
+                {
+                    return candidate.Person;
+                }
+            }
+
+            return candidates.MinBy(x => x.Person.Id).Person;
+        }
+
+        private sealed record GeneralSettingsSnapshot(
+            bool EnableGuarantee,
+            int GuaranteeThreshold,
+            int PacerThreshold,
+            Dictionary<string, double> GuaranteeWeights,
+            HashSet<string> PacerNames)
+        {
+            internal static readonly GeneralSettingsSnapshot Empty =
+                new(false, 1, 1, new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase), new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
         private static double GetTrueRandomDouble()
         {
-            // 使用加密随机数生成器获得真正的随机数
-            // 获取0.0到1.0之间的均匀分布的双精度浮点数
             Span<byte> bytes = stackalloc byte[8];
             RandomNumberGenerator.Fill(bytes);
-            // 转换为UInt64并归一化到[0, 1)范围内
             ulong value = BitConverter.ToUInt64(bytes);
-            // 使用双精度浮点数的有效精度范围（53位）
-            return (value >> 11) * (1.0 / 9007199254740992.0); // 1.0 / 2^53，确保范围[0, 1)
+            return (value >> 11) * (1.0 / 9007199254740992.0);
         }
     }
 }
-
