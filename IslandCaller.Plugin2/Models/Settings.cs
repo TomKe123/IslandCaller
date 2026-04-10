@@ -40,6 +40,7 @@ namespace IslandCaller.Models
         {
             RegistryKey? IsC_RootKey = Registry.CurrentUser.CreateSubKey(@"Software\IslandCaller", writable: true);
             RegistryKey? IsC_GeneralKey = IsC_RootKey?.CreateSubKey("General", writable: true);
+            RegistryKey? IsC_GachaKey = IsC_RootKey?.CreateSubKey("Gacha", writable: true);
             RegistryKey? IsC_ProfileKey = IsC_RootKey?.CreateSubKey("Profile", writable: true);
             RegistryKey? IsC_HoverKey = IsC_RootKey?.CreateSubKey("Hover", writable: true);
             RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.CreateSubKey("Position", writable: true);
@@ -55,6 +56,7 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
             IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
             IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
+            SaveGachaSettings(IsC_GachaKey);
             IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
             IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
             IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
@@ -73,6 +75,7 @@ namespace IslandCaller.Models
         {
             RegistryKey? IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
             RegistryKey? IsC_GeneralKey;
+            RegistryKey? IsC_GachaKey;
             RegistryKey? IsC_ProfileKey;
             RegistryKey? IsC_HoverKey;
             RegistryKey? IsC_HoverKey_Position;
@@ -92,6 +95,7 @@ namespace IslandCaller.Models
                 }
 
                 IsC_GeneralKey = IsC_RootKey?.OpenSubKey("General", writable: true);
+                IsC_GachaKey = IsC_RootKey?.OpenSubKey("Gacha", writable: true) ?? IsC_RootKey?.CreateSubKey("Gacha", writable: true);
                 IsC_ProfileKey = IsC_RootKey?.OpenSubKey("Profile", writable: true);
                 IsC_HoverKey = IsC_RootKey?.OpenSubKey("Hover", writable: true);
                 IsC_HoverKey_Position = IsC_HoverKey?.OpenSubKey("Position", writable: true);
@@ -107,6 +111,7 @@ namespace IslandCaller.Models
                 Instance.General.PacerListJson = (IsC_GeneralKey?.GetValue("PacerListJson") as string) ?? "[]";
                 Instance.General.PacerListDate = (IsC_GeneralKey?.GetValue("PacerListDate") as string) ?? string.Empty;
                 Instance.General.PacerThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("PacerThreshold") ?? 50);
+                LoadGachaSettings(IsC_GachaKey);
                 Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));
                 Instance.Profile.DefaultProfile = Guid.Parse((IsC_ProfileKey?.GetValue("DefaultProfileName") as string) ?? Guid.Empty.ToString());
                 Instance.Profile.IsPreferProfile = Convert.ToBoolean(IsC_ProfileKey?.GetValue("IsPreferProfile") ?? false);
@@ -126,6 +131,7 @@ namespace IslandCaller.Models
         {
             RegistryKey? IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
             RegistryKey? IsC_GeneralKey = IsC_RootKey?.OpenSubKey("General", writable: true);
+            RegistryKey? IsC_GachaKey = IsC_RootKey?.OpenSubKey("Gacha", writable: true) ?? IsC_RootKey?.CreateSubKey("Gacha", writable: true);
             RegistryKey? IsC_ProfileKey = IsC_RootKey?.OpenSubKey("Profile", writable: true);
             RegistryKey? IsC_HoverKey = IsC_RootKey?.OpenSubKey("Hover", writable: true);
             RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.OpenSubKey("Position", writable: true);
@@ -141,6 +147,7 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
             IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
             IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
+            SaveGachaSettings(IsC_GachaKey);
             IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
             IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
             IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
@@ -151,6 +158,36 @@ namespace IslandCaller.Models
             IsC_HoverKey_Position?.SetValue("X", Instance.Hover.Position.X);
             IsC_HoverKey_Position?.SetValue("Y", Instance.Hover.Position.Y);
         }
+
+        private static void SaveGachaSettings(RegistryKey? gachaKey)
+        {
+            gachaKey?.SetValue("Enabled", Instance.Gacha.Enabled);
+            gachaKey?.SetValue("FiveStarBaseRate", Instance.Gacha.FiveStarBaseRate);
+            gachaKey?.SetValue("FiveStarSoftPityStart", Instance.Gacha.FiveStarSoftPityStart);
+            gachaKey?.SetValue("FiveStarHardPity", Instance.Gacha.FiveStarHardPity);
+            gachaKey?.SetValue("FiveStarSoftPityStep", Instance.Gacha.FiveStarSoftPityStep);
+            gachaKey?.SetValue("FourStarBaseRate", Instance.Gacha.FourStarBaseRate);
+            gachaKey?.SetValue("FourStarSoftPityStart", Instance.Gacha.FourStarSoftPityStart);
+            gachaKey?.SetValue("FourStarHardPity", Instance.Gacha.FourStarHardPity);
+            gachaKey?.SetValue("FourStarSoftPityStep", Instance.Gacha.FourStarSoftPityStep);
+            gachaKey?.SetValue("FiveStarFeaturedRate", Instance.Gacha.FiveStarFeaturedRate);
+            gachaKey?.SetValue("FourStarFeaturedRate", Instance.Gacha.FourStarFeaturedRate);
+        }
+
+        private static void LoadGachaSettings(RegistryKey? gachaKey)
+        {
+            Instance.Gacha.Enabled = Convert.ToBoolean(gachaKey?.GetValue("Enabled") ?? false);
+            Instance.Gacha.FiveStarBaseRate = Convert.ToDouble(gachaKey?.GetValue("FiveStarBaseRate") ?? 0.006);
+            Instance.Gacha.FiveStarSoftPityStart = Convert.ToInt32(gachaKey?.GetValue("FiveStarSoftPityStart") ?? 74);
+            Instance.Gacha.FiveStarHardPity = Convert.ToInt32(gachaKey?.GetValue("FiveStarHardPity") ?? 90);
+            Instance.Gacha.FiveStarSoftPityStep = Convert.ToDouble(gachaKey?.GetValue("FiveStarSoftPityStep") ?? 0.06);
+            Instance.Gacha.FourStarBaseRate = Convert.ToDouble(gachaKey?.GetValue("FourStarBaseRate") ?? 0.051);
+            Instance.Gacha.FourStarSoftPityStart = Convert.ToInt32(gachaKey?.GetValue("FourStarSoftPityStart") ?? 9);
+            Instance.Gacha.FourStarHardPity = Convert.ToInt32(gachaKey?.GetValue("FourStarHardPity") ?? 10);
+            Instance.Gacha.FourStarSoftPityStep = Convert.ToDouble(gachaKey?.GetValue("FourStarSoftPityStep") ?? 0.225);
+            Instance.Gacha.FiveStarFeaturedRate = Convert.ToDouble(gachaKey?.GetValue("FiveStarFeaturedRate") ?? 0.5);
+            Instance.Gacha.FourStarFeaturedRate = Convert.ToDouble(gachaKey?.GetValue("FourStarFeaturedRate") ?? 0.5);
+        }
     }
     public static class SettingsBinder
     {
@@ -158,6 +195,7 @@ namespace IslandCaller.Models
         {
             // General
             model.General.PropertyChanged += (_, _) => onChange();
+            model.Gacha.PropertyChanged += (_, _) => onChange();
 
             // Hover
             model.Hover.PropertyChanged += (_, _) => onChange();

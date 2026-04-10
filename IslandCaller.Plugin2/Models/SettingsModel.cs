@@ -6,6 +6,7 @@ namespace IslandCaller.Models
     public class SettingsModel
     {
         public GeneralSetting General { get; set; } = new GeneralSetting();
+        public GachaSetting Gacha { get; set; } = new GachaSetting();
         public ProfileSetting Profile { get; set; } = new ProfileSetting();
         public HoverSetting Hover { get; set; } = new HoverSetting();
     }
@@ -109,6 +110,105 @@ namespace IslandCaller.Models
         {
             get => _pacerThreshold;
             set { if (_pacerThreshold != value) { _pacerThreshold = value; OnPropertyChanged(nameof(PacerThreshold)); } }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string name) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public class GachaSetting : INotifyPropertyChanged
+    {
+        public GachaSetting()
+        {
+            _enabled = false;
+            _fiveStarBaseRate = 0.006;
+            _fiveStarSoftPityStart = 74;
+            _fiveStarHardPity = 90;
+            _fiveStarSoftPityStep = 0.06;
+            _fourStarBaseRate = 0.051;
+            _fourStarSoftPityStart = 9;
+            _fourStarHardPity = 10;
+            _fourStarSoftPityStep = 0.225;
+            _fiveStarFeaturedRate = 0.5;
+            _fourStarFeaturedRate = 0.5;
+        }
+
+        private bool _enabled;
+        public bool Enabled
+        {
+            get => _enabled;
+            set { if (_enabled != value) { _enabled = value; OnPropertyChanged(nameof(Enabled)); } }
+        }
+
+        private double _fiveStarBaseRate;
+        public double FiveStarBaseRate
+        {
+            get => _fiveStarBaseRate;
+            set { if (_fiveStarBaseRate != value) { _fiveStarBaseRate = value; OnPropertyChanged(nameof(FiveStarBaseRate)); } }
+        }
+
+        private int _fiveStarSoftPityStart;
+        public int FiveStarSoftPityStart
+        {
+            get => _fiveStarSoftPityStart;
+            set { if (_fiveStarSoftPityStart != value) { _fiveStarSoftPityStart = value; OnPropertyChanged(nameof(FiveStarSoftPityStart)); } }
+        }
+
+        private int _fiveStarHardPity;
+        public int FiveStarHardPity
+        {
+            get => _fiveStarHardPity;
+            set { if (_fiveStarHardPity != value) { _fiveStarHardPity = value; OnPropertyChanged(nameof(FiveStarHardPity)); } }
+        }
+
+        private double _fiveStarSoftPityStep;
+        public double FiveStarSoftPityStep
+        {
+            get => _fiveStarSoftPityStep;
+            set { if (_fiveStarSoftPityStep != value) { _fiveStarSoftPityStep = value; OnPropertyChanged(nameof(FiveStarSoftPityStep)); } }
+        }
+
+        private double _fourStarBaseRate;
+        public double FourStarBaseRate
+        {
+            get => _fourStarBaseRate;
+            set { if (_fourStarBaseRate != value) { _fourStarBaseRate = value; OnPropertyChanged(nameof(FourStarBaseRate)); } }
+        }
+
+        private int _fourStarSoftPityStart;
+        public int FourStarSoftPityStart
+        {
+            get => _fourStarSoftPityStart;
+            set { if (_fourStarSoftPityStart != value) { _fourStarSoftPityStart = value; OnPropertyChanged(nameof(FourStarSoftPityStart)); } }
+        }
+
+        private int _fourStarHardPity;
+        public int FourStarHardPity
+        {
+            get => _fourStarHardPity;
+            set { if (_fourStarHardPity != value) { _fourStarHardPity = value; OnPropertyChanged(nameof(FourStarHardPity)); } }
+        }
+
+        private double _fourStarSoftPityStep;
+        public double FourStarSoftPityStep
+        {
+            get => _fourStarSoftPityStep;
+            set { if (_fourStarSoftPityStep != value) { _fourStarSoftPityStep = value; OnPropertyChanged(nameof(FourStarSoftPityStep)); } }
+        }
+
+        private double _fiveStarFeaturedRate;
+        public double FiveStarFeaturedRate
+        {
+            get => _fiveStarFeaturedRate;
+            set { if (_fiveStarFeaturedRate != value) { _fiveStarFeaturedRate = value; OnPropertyChanged(nameof(FiveStarFeaturedRate)); } }
+        }
+
+        private double _fourStarFeaturedRate;
+        public double FourStarFeaturedRate
+        {
+            get => _fourStarFeaturedRate;
+            set { if (_fourStarFeaturedRate != value) { _fourStarFeaturedRate = value; OnPropertyChanged(nameof(FourStarFeaturedRate)); } }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

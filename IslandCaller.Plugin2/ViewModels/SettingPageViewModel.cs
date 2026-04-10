@@ -65,6 +65,83 @@ namespace IslandCaller.ViewModels
             set => this.RaiseAndSetIfChanged(ref _pacerThreshold, value);
         }
 
+        private bool _isGachaEnabled;
+        public bool IsGachaEnabled
+        {
+            get => _isGachaEnabled;
+            set => this.RaiseAndSetIfChanged(ref _isGachaEnabled, value);
+        }
+
+        private double _fiveStarBaseRate;
+        public double FiveStarBaseRate
+        {
+            get => _fiveStarBaseRate;
+            set => this.RaiseAndSetIfChanged(ref _fiveStarBaseRate, value);
+        }
+
+        private int _fiveStarSoftPityStart;
+        public int FiveStarSoftPityStart
+        {
+            get => _fiveStarSoftPityStart;
+            set => this.RaiseAndSetIfChanged(ref _fiveStarSoftPityStart, value);
+        }
+
+        private int _fiveStarHardPity;
+        public int FiveStarHardPity
+        {
+            get => _fiveStarHardPity;
+            set => this.RaiseAndSetIfChanged(ref _fiveStarHardPity, value);
+        }
+
+        private double _fiveStarSoftPityStep;
+        public double FiveStarSoftPityStep
+        {
+            get => _fiveStarSoftPityStep;
+            set => this.RaiseAndSetIfChanged(ref _fiveStarSoftPityStep, value);
+        }
+
+        private double _fourStarBaseRate;
+        public double FourStarBaseRate
+        {
+            get => _fourStarBaseRate;
+            set => this.RaiseAndSetIfChanged(ref _fourStarBaseRate, value);
+        }
+
+        private int _fourStarSoftPityStart;
+        public int FourStarSoftPityStart
+        {
+            get => _fourStarSoftPityStart;
+            set => this.RaiseAndSetIfChanged(ref _fourStarSoftPityStart, value);
+        }
+
+        private int _fourStarHardPity;
+        public int FourStarHardPity
+        {
+            get => _fourStarHardPity;
+            set => this.RaiseAndSetIfChanged(ref _fourStarHardPity, value);
+        }
+
+        private double _fourStarSoftPityStep;
+        public double FourStarSoftPityStep
+        {
+            get => _fourStarSoftPityStep;
+            set => this.RaiseAndSetIfChanged(ref _fourStarSoftPityStep, value);
+        }
+
+        private double _fiveStarFeaturedRate;
+        public double FiveStarFeaturedRate
+        {
+            get => _fiveStarFeaturedRate;
+            set => this.RaiseAndSetIfChanged(ref _fiveStarFeaturedRate, value);
+        }
+
+        private double _fourStarFeaturedRate;
+        public double FourStarFeaturedRate
+        {
+            get => _fourStarFeaturedRate;
+            set => this.RaiseAndSetIfChanged(ref _fourStarFeaturedRate, value);
+        }
+
         private string _guaranteeListText = string.Empty;
         public string GuaranteeListText
         {
@@ -122,6 +199,13 @@ namespace IslandCaller.ViewModels
         {
             get => _pacerSummaryText;
             set => this.RaiseAndSetIfChanged(ref _pacerSummaryText, value);
+        }
+
+        private string _gachaSummaryText = string.Empty;
+        public string GachaSummaryText
+        {
+            get => _gachaSummaryText;
+            set => this.RaiseAndSetIfChanged(ref _gachaSummaryText, value);
         }
 
         public ICommand RemoveGuaranteeRowCommand => new RelayCommand<GuaranteeWeightModel>(row =>
@@ -253,6 +337,20 @@ namespace IslandCaller.ViewModels
                 get => _manualWeight;
                 set => this.RaiseAndSetIfChanged(ref _manualWeight, value);
             }
+
+            private int _rarity = 3;
+            public int Rarity
+            {
+                get => _rarity;
+                set => this.RaiseAndSetIfChanged(ref _rarity, value);
+            }
+
+            private bool _isFeatured;
+            public bool IsFeatured
+            {
+                get => _isFeatured;
+                set => this.RaiseAndSetIfChanged(ref _isFeatured, value);
+            }
         }
         private readonly Dictionary<StudentModel, PropertyChangedEventHandler> _handlers = new();
         private ObservableCollection<StudentModel> _profileList = new();
@@ -261,6 +359,7 @@ namespace IslandCaller.ViewModels
             get => _profileList;
             set => this.RaiseAndSetIfChanged(ref _profileList, value);
         }
+        public IReadOnlyList<int> RarityOptions { get; } = [3, 4, 5];
         public ICommand RowCommand => new RelayCommand<StudentModel>(row =>
         {
             if (row == null) return;
@@ -289,6 +388,17 @@ namespace IslandCaller.ViewModels
             IsGuaranteeEnabled = Settings.Instance.General.EnableGuarantee;
             GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
             PacerThreshold = Settings.Instance.General.PacerThreshold;
+            IsGachaEnabled = Settings.Instance.Gacha.Enabled;
+            FiveStarBaseRate = Settings.Instance.Gacha.FiveStarBaseRate;
+            FiveStarSoftPityStart = Settings.Instance.Gacha.FiveStarSoftPityStart;
+            FiveStarHardPity = Settings.Instance.Gacha.FiveStarHardPity;
+            FiveStarSoftPityStep = Settings.Instance.Gacha.FiveStarSoftPityStep;
+            FourStarBaseRate = Settings.Instance.Gacha.FourStarBaseRate;
+            FourStarSoftPityStart = Settings.Instance.Gacha.FourStarSoftPityStart;
+            FourStarHardPity = Settings.Instance.Gacha.FourStarHardPity;
+            FourStarSoftPityStep = Settings.Instance.Gacha.FourStarSoftPityStep;
+            FiveStarFeaturedRate = Settings.Instance.Gacha.FiveStarFeaturedRate;
+            FourStarFeaturedRate = Settings.Instance.Gacha.FourStarFeaturedRate;
             GuaranteeListText = Settings.Instance.General.GuaranteeListText;
             GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
             UpdateGuaranteeMemberOptions(profileService);
@@ -302,7 +412,9 @@ namespace IslandCaller.ViewModels
                 ID = m.Id,
                 Name = m.Name,
                 Gender = m.Gender,
-                ManualWeight = m.ManualWeight
+                ManualWeight = m.ManualWeight,
+                Rarity = (int)m.Rarity,
+                IsFeatured = m.IsFeatured
             });
             ProfileList = new ObservableCollection<StudentModel>(profile);
 
@@ -351,6 +463,52 @@ namespace IslandCaller.ViewModels
                     RefreshPacerList(profileService);
                     RefreshHistoryAndStatistics(historyService);
                 }
+                else if (args.PropertyName == nameof(IsGachaEnabled))
+                {
+                    Settings.Instance.Gacha.Enabled = IsGachaEnabled;
+                    RefreshHistoryAndStatistics(historyService);
+                    UpdateGachaSummary(historyService);
+                }
+                else if (args.PropertyName == nameof(FiveStarBaseRate))
+                {
+                    Settings.Instance.Gacha.FiveStarBaseRate = Math.Clamp(FiveStarBaseRate, 0.0, 1.0);
+                }
+                else if (args.PropertyName == nameof(FiveStarSoftPityStart))
+                {
+                    Settings.Instance.Gacha.FiveStarSoftPityStart = Math.Max(1, FiveStarSoftPityStart);
+                }
+                else if (args.PropertyName == nameof(FiveStarHardPity))
+                {
+                    Settings.Instance.Gacha.FiveStarHardPity = Math.Max(1, FiveStarHardPity);
+                }
+                else if (args.PropertyName == nameof(FiveStarSoftPityStep))
+                {
+                    Settings.Instance.Gacha.FiveStarSoftPityStep = Math.Max(0.0, FiveStarSoftPityStep);
+                }
+                else if (args.PropertyName == nameof(FourStarBaseRate))
+                {
+                    Settings.Instance.Gacha.FourStarBaseRate = Math.Clamp(FourStarBaseRate, 0.0, 1.0);
+                }
+                else if (args.PropertyName == nameof(FourStarSoftPityStart))
+                {
+                    Settings.Instance.Gacha.FourStarSoftPityStart = Math.Max(1, FourStarSoftPityStart);
+                }
+                else if (args.PropertyName == nameof(FourStarHardPity))
+                {
+                    Settings.Instance.Gacha.FourStarHardPity = Math.Max(1, FourStarHardPity);
+                }
+                else if (args.PropertyName == nameof(FourStarSoftPityStep))
+                {
+                    Settings.Instance.Gacha.FourStarSoftPityStep = Math.Max(0.0, FourStarSoftPityStep);
+                }
+                else if (args.PropertyName == nameof(FiveStarFeaturedRate))
+                {
+                    Settings.Instance.Gacha.FiveStarFeaturedRate = Math.Clamp(FiveStarFeaturedRate, 0.0, 1.0);
+                }
+                else if (args.PropertyName == nameof(FourStarFeaturedRate))
+                {
+                    Settings.Instance.Gacha.FourStarFeaturedRate = Math.Clamp(FourStarFeaturedRate, 0.0, 1.0);
+                }
                 else if (args.PropertyName == nameof(GuaranteeListText))
                 {
                     Settings.Instance.General.GuaranteeListText = GuaranteeListText;
@@ -381,14 +539,7 @@ namespace IslandCaller.ViewModels
                 }
                 else if (args.PropertyName == nameof(ProfileList))
                 {
-                    List<Person> list = ProfileList
-                        .Select(s => new Person
-                        {
-                            Id = s.ID,
-                            Name = s.Name,
-                            Gender = s.Gender,
-                            ManualWeight = s.ManualWeight
-                        }).ToList();
+                    List<Person> list = BuildProfilePersons();
                     profileService.Members = list;
                     profileService.SaveProfile(CurrentProfile, list);
                     historyService.Load(CurrentProfile);
@@ -397,6 +548,7 @@ namespace IslandCaller.ViewModels
                     UpdateGuaranteeSummary(profileService);
                     UpdateGuaranteeMemberOptions(profileService);
                     RefreshPacerList(profileService);
+                    UpdateGachaSummary(historyService);
                     RefreshHistoryAndStatistics(historyService);
                 }
             };
@@ -408,6 +560,7 @@ namespace IslandCaller.ViewModels
                 UpdateGuaranteeSummary(profileService);
                 UpdateGuaranteeMemberOptions(profileService);
                 RefreshPacerList(profileService);
+                UpdateGachaSummary(historyService);
             };
 
             ProfileList.CollectionChanged += (s, e) =>
@@ -418,14 +571,7 @@ namespace IslandCaller.ViewModels
                     {
                         PropertyChangedEventHandler handler = (_, _) =>
                         {
-                            List<Person> list = ProfileList
-                                .Select(s => new Person
-                                {
-                                    Id = s.ID,
-                                    Name = s.Name,
-                                    Gender = s.Gender,
-                                    ManualWeight = s.ManualWeight
-                                }).ToList();
+                            List<Person> list = BuildProfilePersons();
 
                             profileService.Members = list;
                             profileService.SaveProfile(CurrentProfile, list);
@@ -435,6 +581,7 @@ namespace IslandCaller.ViewModels
                             UpdateGuaranteeSummary(profileService);
                             UpdateGuaranteeMemberOptions(profileService);
                             RefreshPacerList(profileService);
+                            UpdateGachaSummary(historyService);
                             RefreshHistoryAndStatistics(historyService);
                         };
 
@@ -459,14 +606,7 @@ namespace IslandCaller.ViewModels
             {
                 PropertyChangedEventHandler handler = (_, _) =>
                 {
-                    List<Person> list = ProfileList
-                        .Select(s => new Person
-                        {
-                            Id = s.ID,
-                            Name = s.Name,
-                            Gender = s.Gender,
-                            ManualWeight = s.ManualWeight
-                        }).ToList();
+                    List<Person> list = BuildProfilePersons();
 
                     profileService.Members = list;
                     profileService.SaveProfile(CurrentProfile, list);
@@ -476,6 +616,7 @@ namespace IslandCaller.ViewModels
                     UpdateGuaranteeSummary(profileService);
                     UpdateGuaranteeMemberOptions(profileService);
                     RefreshPacerList(profileService);
+                    UpdateGachaSummary(historyService);
                     RefreshHistoryAndStatistics(historyService);
                 };
 
@@ -484,6 +625,7 @@ namespace IslandCaller.ViewModels
             }
 
             UpdateGuaranteeSummary(profileService);
+            UpdateGachaSummary(historyService);
             RefreshHistoryAndStatistics(historyService);
         }
 
@@ -519,6 +661,7 @@ namespace IslandCaller.ViewModels
             var totalLongTerm = historyService.GetTotalLongTermCallCount();
             var average = historyService.GetAverageLongTermCount();
             var recent = historyService.GetRecentCalls(20);
+            var pityState = historyService.GetGachaPityState();
 
             HistoryList.Clear();
             foreach (var item in snapshot)
@@ -538,6 +681,11 @@ namespace IslandCaller.ViewModels
             StatisticsList.Add(new StatisticsItem { Metric = "保底状态", Value = IsGuaranteeEnabled ? "开启" : "关闭" });
             StatisticsList.Add(new StatisticsItem { Metric = "保底阈值", Value = Math.Max(1, GuaranteeThreshold).ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "陪跑保底阈值", Value = Math.Max(1, PacerThreshold).ToString() });
+            StatisticsList.Add(new StatisticsItem { Metric = "角色池模式", Value = IsGachaEnabled ? "开启" : "关闭" });
+            StatisticsList.Add(new StatisticsItem { Metric = "五星水位", Value = pityState.FiveStarPity.ToString() });
+            StatisticsList.Add(new StatisticsItem { Metric = "四星水位", Value = pityState.FourStarPity.ToString() });
+            StatisticsList.Add(new StatisticsItem { Metric = "五星大保底", Value = pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否" });
+            StatisticsList.Add(new StatisticsItem { Metric = "四星大保底", Value = pityState.IsFourStarFeaturedGuaranteed ? "是" : "否" });
             StatisticsList.Add(new StatisticsItem { Metric = "当前名单人数", Value = (ProfileList?.Count ?? 0).ToString() });
 
             RecentCallList.Clear();
@@ -550,6 +698,22 @@ namespace IslandCaller.ViewModels
                     Name = name
                 });
             }
+        }
+
+        private void UpdateGachaSummary(HistoryService historyService)
+        {
+            var pityState = historyService.GetGachaPityState();
+            int fiveStarCount = ProfileList.Count(x => x.Rarity == 5);
+            int fourStarCount = ProfileList.Count(x => x.Rarity == 4);
+            int threeStarCount = ProfileList.Count(x => x.Rarity == 3);
+            int featuredFiveStarCount = ProfileList.Count(x => x.Rarity == 5 && x.IsFeatured);
+            int featuredFourStarCount = ProfileList.Count(x => x.Rarity == 4 && x.IsFeatured);
+
+            GachaSummaryText =
+                $"角色池模式：{(IsGachaEnabled ? "开启" : "关闭")}；" +
+                $"3星={threeStarCount}，4星={fourStarCount}（UP {featuredFourStarCount}），5星={fiveStarCount}（UP {featuredFiveStarCount}）；" +
+                $"当前水位：五星 {pityState.FiveStarPity}/{Math.Max(1, FiveStarHardPity)}，四星 {pityState.FourStarPity}/{Math.Max(1, FourStarHardPity)}；" +
+                $"五星大保底={(pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否")}，四星大保底={(pityState.IsFourStarFeaturedGuaranteed ? "是" : "否")}。";
         }
 
         private void UpdateGuaranteeSummary(ProfileService profileService)
@@ -763,6 +927,21 @@ namespace IslandCaller.ViewModels
             return list.Take(Math.Min(count, list.Count)).ToList();
         }
 
+        private List<Person> BuildProfilePersons()
+        {
+            return ProfileList
+                .Select(s => new Person
+                {
+                    Id = s.ID,
+                    Name = s.Name,
+                    Gender = s.Gender,
+                    ManualWeight = s.ManualWeight,
+                    Rarity = Enum.IsDefined(typeof(GachaRarity), s.Rarity) ? (GachaRarity)s.Rarity : GachaRarity.ThreeStar,
+                    IsFeatured = s.IsFeatured
+                })
+                .ToList();
+        }
+
         private void UpdateGuaranteeListTextFromRows()
         {
             GuaranteeListText = string.Join(",", GuaranteeWeightList
@@ -787,4 +966,3 @@ namespace IslandCaller.ViewModels
 
     }
 }
-

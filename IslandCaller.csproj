@@ -1,0 +1,18 @@
+<Project DefaultTargets="Publish" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <CreateCipx Condition="'$(CreateCipx)' == ''">false</CreateCipx>
+  </PropertyGroup>
+
+  <Target Name="Restore">
+    <Exec Command="dotnet restore &quot;IslandCaller.Plugin2\IslandCaller.Plugin2.csproj&quot;" />
+  </Target>
+
+  <Target Name="Build" DependsOnTargets="Restore">
+    <Exec Command="dotnet build &quot;IslandCaller.Plugin2\IslandCaller.Plugin2.csproj&quot; -c $(Configuration) --no-restore" />
+  </Target>
+
+  <Target Name="Publish" DependsOnTargets="Restore">
+    <Exec Command="dotnet publish &quot;IslandCaller.Plugin2\IslandCaller.Plugin2.csproj&quot; -c $(Configuration) --no-restore -p:CreateCipx=$(CreateCipx)" />
+  </Target>
+</Project>

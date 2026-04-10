@@ -1,5 +1,6 @@
-﻿using IslandCaller.Models;
 using System.Text;
+using System.Text.Json;
+using IslandCaller.Models;
 
 namespace IslandCaller.Services
 {
@@ -19,6 +20,7 @@ namespace IslandCaller.Services
         private readonly Dictionary<string, int> lastSessionHitCallCount = new(StringComparer.OrdinalIgnoreCase);
         private int sessionCallCount;
         private int totalLongTermCallCount;
+        private GachaPityState gachaPityState = new();
         private readonly ProfileService profileService = profileService;
         private readonly Status Status = status;
 
@@ -36,7 +38,11 @@ namespace IslandCaller.Services
             return Path.Combine(GetBasePath(), $"{guid}.txt");
         }
 
-        // 载入长期历史（只加载 Dictionary）
+        private string GetGachaStatePath(Guid guid)
+        {
+            return Path.Combine(GetBasePath(), $"{guid}.gacha.json");
+        }
+
         public void Load(Guid guid)
         {
             Status.HistoryServiceInitialized = false;
@@ -46,113 +52,105 @@ namespace IslandCaller.Services
             top20List.Clear();
             sessionCallCount = 0;
             totalLongTermCallCount = 0;
+            gachaPityState = LoadGachaState(guid);
 
             string filePath = GetFilePath(guid);
-
-            // 先构建一个 name → count 的临时字典，用于快速查找
             var csvDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             if (File.Exists(filePath))
             {
-                var lines = File.ReadAllLines(filePath);
-
-                foreach (var line in lines)
+                foreach (var line in File.ReadAllLines(filePath))
                 {
                     var parts = line.Split(',');
-
                     if (parts.Length != 2)
+                    {
                         continue;
+                    }
 
                     string name = parts[0].Trim();
-
                     if (int.TryParse(parts[1], out int count))
                     {
-                        // 只记录，不判断是否在 Members 中
                         csvDict[name] = count;
                     }
                 }
             }
 
-            // 以 Members 为基准加载
             foreach (var person in profileService.Members)
             {
                 string name = person.Name;
-
                 if (csvDict.TryGetValue(name, out int count))
                 {
-                    historyDict[name] = count;   // CSV 有 → 用 CSV 的值
+                    historyDict[name] = count;
                     totalLongTermCallCount += count;
                 }
                 else
                 {
-                    historyDict[name] = 0;       // CSV 没有 → 记为 0
+                    historyDict[name] = 0;
                 }
 
                 lastSessionHitCallCount[name] = 0;
             }
+
             Status.HistoryServiceInitialized = true;
         }
 
-        // 写入历史
         public void Add(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
+            {
                 return;
+            }
 
             EnsureMemberCounters();
             string normalizedName = name.Trim();
 
-            // 1️ 更新 Dictionary（统计次数）
             if (historyDict.ContainsKey(normalizedName))
+            {
                 historyDict[normalizedName]++;
+            }
             else
+            {
                 historyDict[normalizedName] = 1;
-            totalLongTermCallCount++;
+            }
 
-            // 2️ 更新 top20（允许重复）
+            totalLongTermCallCount++;
             sessionCallCount++;
             lastSessionHitCallCount[normalizedName] = sessionCallCount;
             top20List.Insert(0, normalizedName);
 
             if (top20List.Count > 20)
+            {
                 top20List.RemoveAt(top20List.Count - 1);
-            RebuildRecentCallIndex();
+            }
 
-            // 3️自动保存
-            Guid guid = Settings.Instance.Profile.DefaultProfile;
-            Save(guid);
+            RebuildRecentCallIndex();
+            Save(Settings.Instance.Profile.DefaultProfile);
         }
 
-        // 保存长期记录到本地
         private void Save(Guid guid)
         {
             string basePath = GetBasePath();
             if (!Directory.Exists(basePath))
+            {
                 Directory.CreateDirectory(basePath);
+            }
 
             string filePath = GetFilePath(guid);
-
             StringBuilder sb = new();
-
             foreach (var pair in historyDict)
             {
                 sb.AppendLine($"{pair.Key},{pair.Value}");
             }
 
             File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+            SaveGachaState(guid);
         }
 
-        // 获取长期记录中某个名字的出现次数
         public int GetLongTermCount(string name)
         {
-            if (historyDict.TryGetValue(name, out int count))
-                return count;
-
-            return 0;
+            return historyDict.TryGetValue(name, out int count) ? count : 0;
         }
 
-        // 获取短期记录中的序号（1-based）
-        // 不存在返回 -1
         public int GetLastCallIndex(string name)
         {
             return recentCallIndex.TryGetValue(name, out int index) ? index : -1;
@@ -161,10 +159,9 @@ namespace IslandCaller.Services
         public int GetSessionMissCount(string name)
         {
             EnsureMemberCounters();
-            if (lastSessionHitCallCount.TryGetValue(name, out int lastHit))
-                return sessionCallCount - lastHit;
-
-            return 0;
+            return lastSessionHitCallCount.TryGetValue(name, out int lastHit)
+                ? sessionCallCount - lastHit
+                : 0;
         }
 
         public int GetSessionCallCount()
@@ -175,7 +172,6 @@ namespace IslandCaller.Services
         public void ResetSessionMissCounts(IEnumerable<string> names)
         {
             EnsureMemberCounters();
-
             foreach (var name in names)
             {
                 if (string.IsNullOrWhiteSpace(name))
@@ -183,7 +179,7 @@ namespace IslandCaller.Services
                     continue;
                 }
 
-                var key = name.Trim();
+                string key = name.Trim();
                 if (lastSessionHitCallCount.ContainsKey(key))
                 {
                     lastSessionHitCallCount[key] = sessionCallCount;
@@ -191,27 +187,24 @@ namespace IslandCaller.Services
             }
         }
 
-        // 获取长期平均次数
         public double GetAverageLongTermCount()
         {
-            if (historyDict.Count == 0)
-                return 0;
-            return (double)totalLongTermCallCount / historyDict.Count;
+            return historyDict.Count == 0 ? 0 : (double)totalLongTermCallCount / historyDict.Count;
         }
 
-        // 清空长期记录
         public void ClearLongTermHistory()
         {
             historyDict.Clear();
             totalLongTermCallCount = 0;
+            gachaPityState = new GachaPityState();
             foreach (var name in profileService.Members.Select(x => x.Name))
             {
                 historyDict[name] = 0;
             }
+
             Save(Settings.Instance.Profile.DefaultProfile);
         }
 
-        // 清空短期记录
         public void ClearThisLessonHistory()
         {
             top20List.Clear();
@@ -227,7 +220,6 @@ namespace IslandCaller.Services
         public IReadOnlyList<HistorySnapshotItem> GetHistorySnapshot()
         {
             EnsureMemberCounters();
-
             return profileService.Members
                 .OrderBy(x => x.Id)
                 .Select(x => new HistorySnapshotItem
@@ -247,10 +239,32 @@ namespace IslandCaller.Services
 
         public IReadOnlyList<string> GetRecentCalls(int count)
         {
-            if (count <= 0)
-                return [];
+            return count <= 0 ? [] : top20List.Take(count).ToList();
+        }
 
-            return top20List.Take(count).ToList();
+        public GachaPityState GetGachaPityState()
+        {
+            return new GachaPityState
+            {
+                FiveStarPity = gachaPityState.FiveStarPity,
+                FourStarPity = gachaPityState.FourStarPity,
+                IsFiveStarFeaturedGuaranteed = gachaPityState.IsFiveStarFeaturedGuaranteed,
+                IsFourStarFeaturedGuaranteed = gachaPityState.IsFourStarFeaturedGuaranteed,
+                TotalDrawCount = gachaPityState.TotalDrawCount
+            };
+        }
+
+        public void UpdateGachaPityState(GachaPityState state)
+        {
+            gachaPityState = new GachaPityState
+            {
+                FiveStarPity = Math.Max(0, state.FiveStarPity),
+                FourStarPity = Math.Max(0, state.FourStarPity),
+                IsFiveStarFeaturedGuaranteed = state.IsFiveStarFeaturedGuaranteed,
+                IsFourStarFeaturedGuaranteed = state.IsFourStarFeaturedGuaranteed,
+                TotalDrawCount = Math.Max(0, state.TotalDrawCount)
+            };
+            SaveGachaState(Settings.Instance.Profile.DefaultProfile);
         }
 
         private void EnsureMemberCounters()
@@ -280,6 +294,36 @@ namespace IslandCaller.Services
                     recentCallIndex[name] = i;
                 }
             }
+        }
+
+        private GachaPityState LoadGachaState(Guid guid)
+        {
+            string path = GetGachaStatePath(guid);
+            if (!File.Exists(path))
+            {
+                return new GachaPityState();
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<GachaPityState>(File.ReadAllText(path, Encoding.UTF8)) ?? new GachaPityState();
+            }
+            catch
+            {
+                return new GachaPityState();
+            }
+        }
+
+        private void SaveGachaState(Guid guid)
+        {
+            string basePath = GetBasePath();
+            if (!Directory.Exists(basePath))
+            {
+                Directory.CreateDirectory(basePath);
+            }
+
+            string path = GetGachaStatePath(guid);
+            File.WriteAllText(path, JsonSerializer.Serialize(gachaPityState), Encoding.UTF8);
         }
     }
 }

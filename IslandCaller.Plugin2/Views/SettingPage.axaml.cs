@@ -67,7 +67,9 @@ public partial class SettingPage : SettingsPageBase
             ID = nextId,
             Name = "",
             Gender = 0,
-            ManualWeight = 1.0
+            ManualWeight = 1.0,
+            Rarity = 3,
+            IsFeatured = false
         });
         vm.RefreshHistoryAndStatistics(HistoryService);
         logger?.LogInformation("手动新增名单项，ID: {Id}", nextId);
@@ -162,7 +164,9 @@ public partial class SettingPage : SettingsPageBase
                     ID = m.Id,
                     Name = m.Name,
                     Gender = m.Gender,
-                    ManualWeight = m.ManualWeight
+                    ManualWeight = m.ManualWeight,
+                    Rarity = (int)m.Rarity,
+                    IsFeatured = m.IsFeatured
                 });
 
             if (vm != null)

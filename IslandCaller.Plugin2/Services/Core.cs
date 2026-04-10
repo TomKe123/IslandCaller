@@ -14,7 +14,8 @@ namespace IslandCaller.Services
         private readonly Status status;
         private const double MaxPacerWeightBoost = 1.15;
         private bool settingsCacheDirty = true;
-        private GeneralSettingsSnapshot settingsSnapshot = GeneralSettingsSnapshot.Empty;
+        private GeneralSettingsSnapshot generalSettingsSnapshot = GeneralSettingsSnapshot.Empty;
+        private GachaSettingsSnapshot gachaSettingsSnapshot = GachaSettingsSnapshot.Empty;
 
         public CoreService(ProfileService profileService, HistoryService historyService, ILogger<CoreService> logger, Status status)
         {
@@ -22,14 +23,21 @@ namespace IslandCaller.Services
             this.historyService = historyService;
             this.logger = logger;
             this.status = status;
-            Settings.Instance.General.PropertyChanged += OnGeneralSettingsChanged;
+            Settings.Instance.General.PropertyChanged += OnSettingsChanged;
+            Settings.Instance.Gacha.PropertyChanged += OnSettingsChanged;
         }
 
         internal enum DrawType
         {
             Normal,
             Pacer,
-            Guarantee
+            Guarantee,
+            ThreeStar,
+            FourStar,
+            FeaturedFourStar,
+            FiveStar,
+            FeaturedFiveStar,
+            CapturedRadiance
         }
 
         internal readonly record struct DrawResult(string Name, DrawType Type);
@@ -42,6 +50,8 @@ namespace IslandCaller.Services
             internal int Gender { get; set; }
             internal double ManualWeight { get; set; } = 1.0;
             internal double Weight { get; set; }
+            internal GachaRarity Rarity { get; set; } = GachaRarity.ThreeStar;
+            internal bool IsFeatured { get; set; }
         }
 
         internal List<Person> Persons { get; } = [];
@@ -51,7 +61,7 @@ namespace IslandCaller.Services
         internal void InitializeCore()
         {
             status.IsTimeStatusAvailable = false;
-            logger.LogInformation("初始化 Core 模块，加载学生信息...");
+            logger.LogInformation("Initializing Core service");
             Persons.Clear();
             foreach (var person in profileService.Members)
             {
@@ -62,7 +72,9 @@ namespace IslandCaller.Services
                     NormalizedName = NormalizeName(person.Name),
                     Gender = person.Gender,
                     ManualWeight = person.ManualWeight,
-                    Weight = 0.0
+                    Weight = 0.0,
+                    Rarity = person.Rarity,
+                    IsFeatured = person.IsFeatured
                 });
             }
 
@@ -70,17 +82,213 @@ namespace IslandCaller.Services
             status.CoreServiceInitialized = true;
         }
 
+        internal string GetRandomStudent()
+        {
+            return GetRandomStudentResult().Name;
+        }
+
+        internal DrawResult GetRandomStudentResult()
+        {
+            if (GetGachaSettingsSnapshot().Enabled)
+            {
+                return GetRandomCharacterPoolResult();
+            }
+
+            return GetClassicRandomStudentResult();
+        }
+
+        private DrawResult GetClassicRandomStudentResult()
+        {
+            var settings = GetGeneralSettingsSnapshot();
+            var guaranteed = GetGuaranteedCandidate(settings);
+            if (guaranteed != null)
+            {
+                int sessionMissBeforeHit = historyService.GetSessionMissCount(guaranteed.Name);
+                historyService.Add(guaranteed.Name);
+                RestartGuaranteeCycleIfEarlyHit(guaranteed.Name, settings.GuaranteeWeights, settings.GuaranteeThreshold, sessionMissBeforeHit, settings.EnableGuarantee);
+                ComputeWeightsForAllStudents();
+                return new DrawResult(guaranteed.Name, DrawType.Guarantee);
+            }
+
+            var pacerGuaranteed = GetPacerGuaranteedCandidate(settings);
+            if (pacerGuaranteed != null)
+            {
+                historyService.Add(pacerGuaranteed.Name);
+                ComputeWeightsForAllStudents();
+                return new DrawResult(pacerGuaranteed.Name, DrawType.Pacer);
+            }
+
+            double totalWeight = Persons.Sum(p => p.Weight);
+            if (totalWeight <= 0)
+            {
+                return new DrawResult("Error", DrawType.Normal);
+            }
+
+            double r = GetTrueRandomDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var person in Persons)
+            {
+                cumulative += person.Weight;
+                if (r < cumulative)
+                {
+                    int sessionMissBeforeHit = historyService.GetSessionMissCount(person.Name);
+                    historyService.Add(person.Name);
+                    RestartGuaranteeCycleIfEarlyHit(person.Name, settings.GuaranteeWeights, settings.GuaranteeThreshold, sessionMissBeforeHit, settings.EnableGuarantee);
+                    ComputeWeightsForAllStudents();
+                    return new DrawResult(person.Name, GetClassicDrawType(person.NormalizedName, settings.GuaranteeWeights, settings.PacerNames));
+                }
+            }
+
+            logger.LogWarning("Classic draw failed to resolve a student");
+            return new DrawResult("Error", DrawType.Normal);
+        }
+
+        private DrawResult GetRandomCharacterPoolResult()
+        {
+            var settings = GetGachaSettingsSnapshot();
+            if (Persons.Count == 0)
+            {
+                return new DrawResult("Error", DrawType.Normal);
+            }
+
+            var pityState = historyService.GetGachaPityState();
+            pityState.TotalDrawCount++;
+
+            bool isFiveStar = RollByPity(pityState.FiveStarPity, settings.FiveStarBaseRate, settings.FiveStarSoftPityStart, settings.FiveStarHardPity, settings.FiveStarSoftPityStep);
+            if (isFiveStar)
+            {
+                pityState.FiveStarPity = 0;
+                pityState.FourStarPity = 0;
+                bool capturedRadianceHit = pityState.IsFiveStarFeaturedGuaranteed;
+                bool featuredHit = capturedRadianceHit || RollChance(settings.FiveStarFeaturedRate);
+                var person = PickGachaPerson(GachaRarity.FiveStar, featuredHit);
+                bool selectedIsFeatured = person?.IsFeatured ?? false;
+                pityState.IsFiveStarFeaturedGuaranteed = !selectedIsFeatured;
+                historyService.UpdateGachaPityState(pityState);
+                DrawType fiveStarType = selectedIsFeatured
+                    ? (capturedRadianceHit ? DrawType.CapturedRadiance : DrawType.FeaturedFiveStar)
+                    : DrawType.FiveStar;
+                return FinalizeDraw(person, fiveStarType);
+            }
+
+            bool isFourStar = RollByPity(pityState.FourStarPity, settings.FourStarBaseRate, settings.FourStarSoftPityStart, settings.FourStarHardPity, settings.FourStarSoftPityStep);
+            if (isFourStar)
+            {
+                pityState.FiveStarPity++;
+                pityState.FourStarPity = 0;
+                bool featuredHit = pityState.IsFourStarFeaturedGuaranteed || RollChance(settings.FourStarFeaturedRate);
+                var person = PickGachaPerson(GachaRarity.FourStar, featuredHit);
+                bool selectedIsFeatured = person?.IsFeatured ?? false;
+                pityState.IsFourStarFeaturedGuaranteed = !selectedIsFeatured;
+                historyService.UpdateGachaPityState(pityState);
+                return FinalizeDraw(person, selectedIsFeatured ? DrawType.FeaturedFourStar : DrawType.FourStar);
+            }
+
+            pityState.FiveStarPity++;
+            pityState.FourStarPity++;
+            historyService.UpdateGachaPityState(pityState);
+            return FinalizeDraw(PickGachaPerson(GachaRarity.ThreeStar, preferFeatured: false), DrawType.ThreeStar);
+        }
+
+        private DrawResult FinalizeDraw(Person? person, DrawType fallbackType)
+        {
+            if (person == null)
+            {
+                return new DrawResult("Error", DrawType.Normal);
+            }
+
+            historyService.Add(person.Name);
+            return new DrawResult(person.Name, GetGachaDrawType(person, fallbackType));
+        }
+
+        private Person? PickGachaPerson(GachaRarity rarity, bool preferFeatured)
+        {
+            IEnumerable<Person> matching = Persons.Where(p => p.Rarity == rarity && p.IsFeatured == preferFeatured);
+            var person = PickWeightedPerson(matching.ToList());
+            if (person != null)
+            {
+                return person;
+            }
+
+            matching = Persons.Where(p => p.Rarity == rarity);
+            person = PickWeightedPerson(matching.ToList());
+            if (person != null)
+            {
+                return person;
+            }
+
+            return PickWeightedPerson(Persons);
+        }
+
+        private Person? PickWeightedPerson(IReadOnlyList<Person> persons)
+        {
+            if (persons.Count == 0)
+            {
+                return null;
+            }
+
+            double totalWeight = persons.Sum(x => Math.Max(0.01, x.ManualWeight));
+            if (totalWeight <= 0)
+            {
+                return persons.OrderBy(x => x.Id).FirstOrDefault();
+            }
+
+            double r = GetTrueRandomDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var person in persons)
+            {
+                cumulative += Math.Max(0.01, person.ManualWeight);
+                if (r < cumulative)
+                {
+                    return person;
+                }
+            }
+
+            return persons.OrderBy(x => x.Id).FirstOrDefault();
+        }
+
+        private static DrawType GetGachaDrawType(Person person, DrawType fallbackType)
+        {
+            return person.Rarity switch
+            {
+                GachaRarity.FiveStar when person.IsFeatured => DrawType.FeaturedFiveStar,
+                GachaRarity.FiveStar => DrawType.FiveStar,
+                GachaRarity.FourStar when person.IsFeatured => DrawType.FeaturedFourStar,
+                GachaRarity.FourStar => DrawType.FourStar,
+                GachaRarity.ThreeStar => DrawType.ThreeStar,
+                _ => fallbackType
+            };
+        }
+
+        private static bool RollByPity(int pityCount, double baseRate, int softPityStart, int hardPity, double softPityStep)
+        {
+            int nextPullNumber = pityCount + 1;
+            if (nextPullNumber >= hardPity)
+            {
+                return true;
+            }
+
+            double rate = baseRate;
+            if (nextPullNumber >= softPityStart)
+            {
+                rate += (nextPullNumber - softPityStart + 1) * softPityStep;
+            }
+
+            rate = Math.Clamp(rate, 0.0, 1.0);
+            return RollChance(rate);
+        }
+
+        private static bool RollChance(double chance)
+        {
+            return GetTrueRandomDouble() < Math.Clamp(chance, 0.0, 1.0);
+        }
+
         private double ComputeSingleWeight(double manualWeight, int lastHitStep, int nHist, double avgHist)
         {
             const double fMin = 0;
             const double beta = 0.54;
 
-            int deltaS = lastHitStep;
-            if (deltaS < 0)
-            {
-                deltaS = 15;
-            }
-
+            int deltaS = lastHitStep < 0 ? 15 : lastHitStep;
             double sessionFactor = 1 - (1 - fMin) * Math.Exp(-beta * deltaS);
 
             const double eps = 1.0;
@@ -97,12 +305,20 @@ namespace IslandCaller.Services
 
         private void ComputeWeightsForAllStudents()
         {
+            if (GetGachaSettingsSnapshot().Enabled)
+            {
+                foreach (var person in Persons)
+                {
+                    person.Weight = Math.Max(0.01, person.ManualWeight);
+                }
+                return;
+            }
+
             double avgHist = historyService.GetAverageLongTermCount();
-            var settings = GetSettingsSnapshot();
+            var settings = GetGeneralSettingsSnapshot();
             double dynamicGuaranteeBoost = settings.EnableGuarantee ? GetDynamicGuaranteeBoost(settings.GuaranteeThreshold) : 1.0;
             double dynamicPacerBoost = settings.EnableGuarantee ? GetDynamicPacerBoost(settings.PacerThreshold) : 1.0;
 
-            logger.LogTrace("计算全班历史平均被点次数: {Average}", avgHist);
             foreach (var person in Persons)
             {
                 int nHist = historyService.GetLongTermCount(person.Name);
@@ -119,8 +335,6 @@ namespace IslandCaller.Services
                 }
 
                 person.Weight = weight;
-                logger.LogTrace("计算权重 - 学生: {Name}, ManualWeight: {ManualWeight}, LastHitStep: {LastHitStep}, nHist: {HistoryCount}, Weight: {Weight}",
-                    person.Name, person.ManualWeight, lastHitStep, nHist, weight);
             }
         }
 
@@ -138,65 +352,7 @@ namespace IslandCaller.Services
             return 1.0 + (MaxPacerWeightBoost - 1.0) * progress;
         }
 
-        internal string GetRandomStudent()
-        {
-            return GetRandomStudentResult().Name;
-        }
-
-        internal DrawResult GetRandomStudentResult()
-        {
-            var settings = GetSettingsSnapshot();
-            var guaranteed = GetGuaranteedCandidate(settings);
-            if (guaranteed != null)
-            {
-                int sessionMissBeforeHit = historyService.GetSessionMissCount(guaranteed.Name);
-                historyService.Add(guaranteed.Name);
-                RestartGuaranteeCycleIfEarlyHit(guaranteed.Name, settings.GuaranteeWeights, settings.GuaranteeThreshold, sessionMissBeforeHit, settings.EnableGuarantee);
-                logger.LogTrace("保底命中：{Name}, SessionMiss={SessionMiss}", guaranteed.Name, historyService.GetSessionMissCount(guaranteed.Name));
-                ComputeWeightsForAllStudents();
-                return new DrawResult(guaranteed.Name, DrawType.Guarantee);
-            }
-
-            var pacerGuaranteed = GetPacerGuaranteedCandidate(settings);
-            if (pacerGuaranteed != null)
-            {
-                historyService.Add(pacerGuaranteed.Name);
-                logger.LogTrace("陪跑保底命中：{Name}, SessionMiss={SessionMiss}", pacerGuaranteed.Name, historyService.GetSessionMissCount(pacerGuaranteed.Name));
-                ComputeWeightsForAllStudents();
-                return new DrawResult(pacerGuaranteed.Name, DrawType.Pacer);
-            }
-
-            double totalWeight = Persons.Sum(p => p.Weight);
-            logger.LogTrace("计算权重总和: {TotalWeight}", totalWeight);
-            if (totalWeight <= 0)
-            {
-                return new DrawResult("Error", DrawType.Normal);
-            }
-
-            double r = GetTrueRandomDouble() * totalWeight;
-            logger.LogTrace("生成随机数: {Random} (范围: [0, {TotalWeight}))", r, totalWeight);
-
-            double cumulative = 0;
-            foreach (var person in Persons)
-            {
-                cumulative += person.Weight;
-                if (r < cumulative)
-                {
-                    int sessionMissBeforeHit = historyService.GetSessionMissCount(person.Name);
-                    historyService.Add(person.Name);
-                    RestartGuaranteeCycleIfEarlyHit(person.Name, settings.GuaranteeWeights, settings.GuaranteeThreshold, sessionMissBeforeHit, settings.EnableGuarantee);
-                    logger.LogTrace("抽取到学生：{Name}", person.Name);
-                    ComputeWeightsForAllStudents();
-                    DrawType type = GetDrawType(person.NormalizedName, settings.GuaranteeWeights, settings.PacerNames);
-                    return new DrawResult(person.Name, type);
-                }
-            }
-
-            logger.LogWarning("随机选择学生时发生了意外情况，权重总和: {TotalWeight}, 随机数: {Random}", totalWeight, r);
-            return new DrawResult("Error", DrawType.Normal);
-        }
-
-        private static DrawType GetDrawType(string normalizedName, Dictionary<string, double> guaranteeWeightMap, HashSet<string> pacerNameSet)
+        private static DrawType GetClassicDrawType(string normalizedName, Dictionary<string, double> guaranteeWeightMap, HashSet<string> pacerNameSet)
         {
             if (guaranteeWeightMap.ContainsKey(normalizedName))
             {
@@ -321,28 +477,31 @@ namespace IslandCaller.Services
                 .ToList();
 
             historyService.ResetSessionMissCounts(guaranteeRawNames);
-            logger.LogTrace("保底提前触发后重置计数：{Name}, MissBeforeHit={MissBeforeHit}, Threshold={Threshold}", selectedName, missBeforeHit, threshold);
         }
 
-        private void OnGeneralSettingsChanged(object? sender, PropertyChangedEventArgs e)
+        private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName is nameof(GeneralSetting.EnableGuarantee)
-                or nameof(GeneralSetting.GuaranteeThreshold)
-                or nameof(GeneralSetting.GuaranteeListText)
-                or nameof(GeneralSetting.GuaranteeWeightListJson)
-                or nameof(GeneralSetting.PacerListJson)
-                or nameof(GeneralSetting.PacerThreshold))
-            {
-                settingsCacheDirty = true;
-                ComputeWeightsForAllStudents();
-            }
+            settingsCacheDirty = true;
+            ComputeWeightsForAllStudents();
         }
 
-        private GeneralSettingsSnapshot GetSettingsSnapshot()
+        private GeneralSettingsSnapshot GetGeneralSettingsSnapshot()
+        {
+            EnsureSettingsSnapshots();
+            return generalSettingsSnapshot;
+        }
+
+        private GachaSettingsSnapshot GetGachaSettingsSnapshot()
+        {
+            EnsureSettingsSnapshots();
+            return gachaSettingsSnapshot;
+        }
+
+        private void EnsureSettingsSnapshots()
         {
             if (!settingsCacheDirty)
             {
-                return settingsSnapshot;
+                return;
             }
 
             bool enableGuarantee = Settings.Instance.General.EnableGuarantee;
@@ -357,14 +516,27 @@ namespace IslandCaller.Services
                 pacerNames.ExceptWith(guaranteeWeights.Keys);
             }
 
-            settingsSnapshot = new GeneralSettingsSnapshot(
+            generalSettingsSnapshot = new GeneralSettingsSnapshot(
                 enableGuarantee,
                 Math.Max(1, Settings.Instance.General.GuaranteeThreshold),
                 Math.Max(1, Settings.Instance.General.PacerThreshold),
                 guaranteeWeights,
                 pacerNames);
+
+            gachaSettingsSnapshot = new GachaSettingsSnapshot(
+                Settings.Instance.Gacha.Enabled,
+                Math.Clamp(Settings.Instance.Gacha.FiveStarBaseRate, 0.0, 1.0),
+                Math.Max(1, Settings.Instance.Gacha.FiveStarSoftPityStart),
+                Math.Max(1, Settings.Instance.Gacha.FiveStarHardPity),
+                Math.Max(0.0, Settings.Instance.Gacha.FiveStarSoftPityStep),
+                Math.Clamp(Settings.Instance.Gacha.FourStarBaseRate, 0.0, 1.0),
+                Math.Max(1, Settings.Instance.Gacha.FourStarSoftPityStart),
+                Math.Max(1, Settings.Instance.Gacha.FourStarHardPity),
+                Math.Max(0.0, Settings.Instance.Gacha.FourStarSoftPityStep),
+                Math.Clamp(Settings.Instance.Gacha.FiveStarFeaturedRate, 0.0, 1.0),
+                Math.Clamp(Settings.Instance.Gacha.FourStarFeaturedRate, 0.0, 1.0));
+
             settingsCacheDirty = false;
-            return settingsSnapshot;
         }
 
         private static Dictionary<string, double> ParseGuaranteeWeightMap()
@@ -391,7 +563,6 @@ namespace IslandCaller.Services
             }
             catch
             {
-                // Fallback to legacy plain-text list when json is invalid.
             }
 
             return ParseGuaranteeNames(Settings.Instance.General.GuaranteeListText)
@@ -474,6 +645,23 @@ namespace IslandCaller.Services
         {
             internal static readonly GeneralSettingsSnapshot Empty =
                 new(false, 1, 1, new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase), new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        private sealed record GachaSettingsSnapshot(
+            bool Enabled,
+            double FiveStarBaseRate,
+            int FiveStarSoftPityStart,
+            int FiveStarHardPity,
+            double FiveStarSoftPityStep,
+            double FourStarBaseRate,
+            int FourStarSoftPityStart,
+            int FourStarHardPity,
+            double FourStarSoftPityStep,
+            double FiveStarFeaturedRate,
+            double FourStarFeaturedRate)
+        {
+            internal static readonly GachaSettingsSnapshot Empty =
+                new(false, 0.006, 74, 90, 0.06, 0.051, 9, 10, 0.225, 0.5, 0.5);
         }
 
         private static double GetTrueRandomDouble()

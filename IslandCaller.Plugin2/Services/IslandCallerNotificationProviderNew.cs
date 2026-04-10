@@ -88,6 +88,12 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
         {
             CoreService.DrawType.Guarantee => Brushes.Gold,
             CoreService.DrawType.Pacer => Brushes.MediumPurple,
+            CoreService.DrawType.ThreeStar => Brushes.SteelBlue,
+            CoreService.DrawType.FourStar => Brushes.MediumPurple,
+            CoreService.DrawType.FeaturedFourStar => Brushes.Orchid,
+            CoreService.DrawType.FiveStar => Brushes.DarkOrange,
+            CoreService.DrawType.FeaturedFiveStar => Brushes.Gold,
+            CoreService.DrawType.CapturedRadiance => Brushes.HotPink,
             _ => Brushes.DodgerBlue
         };
     }
