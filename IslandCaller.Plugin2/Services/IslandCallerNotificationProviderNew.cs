@@ -68,6 +68,36 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
         return Task.CompletedTask;
     }
 
+    public void ShowLotteryResult(string prizeName, IReadOnlyList<string> winners)
+    {
+        if (winners.Count == 0)
+        {
+            return;
+        }
+
+        string normalizedPrizeName = string.IsNullOrWhiteSpace(prizeName) ? "抽奖结果" : prizeName.Trim();
+        string content = $"{normalizedPrizeName}：{string.Join("、", winners)}";
+        var maskContent = NotificationContent.CreateTwoIconsMask(content, factory: x =>
+        {
+            x.Duration = TimeSpan.FromSeconds(Math.Clamp(2 + winners.Count, 2, 8));
+            x.IsSpeechEnabled = false;
+            x.Color = Brushes.MediumSeaGreen;
+        });
+        maskContent.Color = Brushes.MediumSeaGreen;
+
+        ShowNotification(new NotificationRequest
+        {
+            MaskContent = maskContent,
+            RequestNotificationSettings =
+            {
+                IsSettingsEnabled = true,
+                IsNotificationEnabled = true,
+                IsNotificationEffectEnabled = true,
+                IsSpeechEnabled = false
+            }
+        });
+    }
+
     private static NotificationRequest BuildSingleNameRequest(string name, IBrush promptColor)
     {
         var maskContent = NotificationContent.CreateTwoIconsMask(name, factory: x =>

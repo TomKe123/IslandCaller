@@ -30,6 +30,7 @@ namespace IslandCaller
             services.AddSingleton<IslandCallerNotificationProviderNew>();
             services.AddNotificationProvider<IslandCallerNotificationProviderNew>();
             services.AddSingleton<IslandCallerService>();
+            services.AddSingleton<LotteryService>();
             services.AddSingleton<ProfileService>();
             services.AddSingleton<HistoryService>();
             services.AddSingleton<CoreService>();

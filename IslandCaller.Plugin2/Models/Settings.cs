@@ -53,6 +53,7 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("GuaranteeThreshold", Instance.General.GuaranteeThreshold);
             IsC_GeneralKey?.SetValue("GuaranteeListText", Instance.General.GuaranteeListText);
             IsC_GeneralKey?.SetValue("GuaranteeWeightListJson", Instance.General.GuaranteeWeightListJson);
+            IsC_GeneralKey?.SetValue("LotteryPrizeListJson", Instance.General.LotteryPrizeListJson);
             IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
             IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
             IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
@@ -108,6 +109,7 @@ namespace IslandCaller.Models
                 Instance.General.GuaranteeThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("GuaranteeThreshold") ?? 40);
                 Instance.General.GuaranteeListText = (IsC_GeneralKey?.GetValue("GuaranteeListText") as string) ?? string.Empty;
                 Instance.General.GuaranteeWeightListJson = (IsC_GeneralKey?.GetValue("GuaranteeWeightListJson") as string) ?? "[]";
+                Instance.General.LotteryPrizeListJson = (IsC_GeneralKey?.GetValue("LotteryPrizeListJson") as string) ?? "[]";
                 Instance.General.PacerListJson = (IsC_GeneralKey?.GetValue("PacerListJson") as string) ?? "[]";
                 Instance.General.PacerListDate = (IsC_GeneralKey?.GetValue("PacerListDate") as string) ?? string.Empty;
                 Instance.General.PacerThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("PacerThreshold") ?? 50);
@@ -144,6 +146,7 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("GuaranteeThreshold", Instance.General.GuaranteeThreshold);
             IsC_GeneralKey?.SetValue("GuaranteeListText", Instance.General.GuaranteeListText);
             IsC_GeneralKey?.SetValue("GuaranteeWeightListJson", Instance.General.GuaranteeWeightListJson);
+            IsC_GeneralKey?.SetValue("LotteryPrizeListJson", Instance.General.LotteryPrizeListJson);
             IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
             IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
             IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);

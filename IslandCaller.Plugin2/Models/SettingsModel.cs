@@ -24,6 +24,7 @@ namespace IslandCaller.Models
             _guaranteeThreshold = 40;
             _guaranteeListText = string.Empty;
             _guaranteeWeightListJson = "[]";
+            _lotteryPrizeListJson = "[]";
             _pacerListJson = "[]";
             _pacerListDate = string.Empty;
             _pacerThreshold = 50;
@@ -89,6 +90,13 @@ namespace IslandCaller.Models
         {
             get => _guaranteeWeightListJson;
             set { if (_guaranteeWeightListJson != value) { _guaranteeWeightListJson = value; OnPropertyChanged(nameof(GuaranteeWeightListJson)); } }
+        }
+
+        private string _lotteryPrizeListJson;
+        public string LotteryPrizeListJson
+        {
+            get => _lotteryPrizeListJson;
+            set { if (_lotteryPrizeListJson != value) { _lotteryPrizeListJson = value; OnPropertyChanged(nameof(LotteryPrizeListJson)); } }
         }
 
         private string _pacerListJson;

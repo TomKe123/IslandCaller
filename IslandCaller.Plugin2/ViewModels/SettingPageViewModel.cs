@@ -243,6 +243,37 @@ namespace IslandCaller.ViewModels
             set => this.RaiseAndSetIfChanged(ref _pacerSummaryText, value);
         }
 
+        public class LotteryPrizeModel : ReactiveObject
+        {
+            private string _name = string.Empty;
+            public string Name
+            {
+                get => _name;
+                set => this.RaiseAndSetIfChanged(ref _name, value);
+            }
+
+            private int _winnerCount = 1;
+            public int WinnerCount
+            {
+                get => _winnerCount;
+                set => this.RaiseAndSetIfChanged(ref _winnerCount, value);
+            }
+        }
+
+        private ObservableCollection<LotteryPrizeModel> _lotteryPrizeList = [];
+        public ObservableCollection<LotteryPrizeModel> LotteryPrizeList
+        {
+            get => _lotteryPrizeList;
+            set => this.RaiseAndSetIfChanged(ref _lotteryPrizeList, value);
+        }
+
+        private string _lotterySummaryText = string.Empty;
+        public string LotterySummaryText
+        {
+            get => _lotterySummaryText;
+            set => this.RaiseAndSetIfChanged(ref _lotterySummaryText, value);
+        }
+
         private string _gachaSummaryText = string.Empty;
         public string GachaSummaryText
         {
@@ -263,6 +294,30 @@ namespace IslandCaller.ViewModels
         public ICommand RefreshUsbAuthCommand => new RelayCommand(() =>
         {
             RefreshUsbAuthStatus(IAppHost.GetService<HistoryService>());
+        });
+
+        public ICommand AddLotteryPrizeCommand => new RelayCommand(() =>
+        {
+            LotteryPrizeList.Add(new LotteryPrizeModel
+            {
+                Name = $"奖项{LotteryPrizeList.Count + 1}",
+                WinnerCount = 1
+            });
+        });
+
+        public ICommand RemoveLotteryPrizeRowCommand => new RelayCommand<LotteryPrizeModel>(row =>
+        {
+            if (row == null)
+            {
+                return;
+            }
+
+            LotteryPrizeList.Remove(row);
+        });
+
+        public ICommand OpenLotteryWindowCommand => new RelayCommand(() =>
+        {
+            IAppHost.GetService<IslandCaller.Services.IslandCallerService.IslandCallerService>().TriggerUriLotteryGuiCall();
         });
 
         public class StatisticsItem : ReactiveObject
@@ -425,6 +480,7 @@ namespace IslandCaller.ViewModels
             ProfileService profileService = IAppHost.GetService<ProfileService>();
             HistoryService historyService = IAppHost.GetService<HistoryService>();
             CoreService coreService = IAppHost.GetService<CoreService>();
+            LotteryService lotteryService = IAppHost.GetService<LotteryService>();
             UsbAuthService usbAuthService = IAppHost.GetService<UsbAuthService>();
             Plugin plugin = IAppHost.GetService<Plugin>();
 
@@ -452,6 +508,7 @@ namespace IslandCaller.ViewModels
             FourStarFeaturedRate = Settings.Instance.Gacha.FourStarFeaturedRate;
             GuaranteeListText = Settings.Instance.General.GuaranteeListText;
             GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
+            LotteryPrizeList = BuildLotteryPrizeList(lotteryService);
             UpdateGuaranteeMemberOptions(profileService);
             RefreshPacerList(profileService);
             IsHoverEnable = Settings.Instance.Hover.IsEnable;
@@ -469,6 +526,7 @@ namespace IslandCaller.ViewModels
             });
             ProfileList = new ObservableCollection<StudentModel>(profile);
             ApplyUsbAuthSnapshot(usbAuthService.RefreshStatus(forceRefresh: true));
+            UpdateLotterySummary();
 
             this.PropertyChanged += (sender, args) =>
             {
@@ -606,6 +664,11 @@ namespace IslandCaller.ViewModels
                     UpdateGuaranteeMemberOptions(profileService);
                     RefreshPacerList(profileService);
                 }
+                else if (args.PropertyName == nameof(LotteryPrizeList))
+                {
+                    SaveLotteryPrizes();
+                    UpdateLotterySummary();
+                }
                 else if (args.PropertyName == nameof(IsHoverEnable))
                 {
                     Settings.Instance.Hover.IsEnable = IsHoverEnable;
@@ -646,6 +709,33 @@ namespace IslandCaller.ViewModels
                 RefreshPacerList(profileService);
                 UpdateGachaSummary(historyService);
             };
+
+            LotteryPrizeList.CollectionChanged += (s, e) =>
+            {
+                if (e.NewItems != null)
+                {
+                    foreach (LotteryPrizeModel prize in e.NewItems)
+                    {
+                        prize.PropertyChanged += LotteryPrize_PropertyChanged;
+                    }
+                }
+
+                if (e.OldItems != null)
+                {
+                    foreach (LotteryPrizeModel prize in e.OldItems)
+                    {
+                        prize.PropertyChanged -= LotteryPrize_PropertyChanged;
+                    }
+                }
+
+                SaveLotteryPrizes();
+                UpdateLotterySummary();
+            };
+
+            foreach (var prize in LotteryPrizeList)
+            {
+                prize.PropertyChanged += LotteryPrize_PropertyChanged;
+            }
 
             ProfileList.CollectionChanged += (s, e) =>
             {
@@ -709,6 +799,7 @@ namespace IslandCaller.ViewModels
             }
 
             UpdateGuaranteeSummary(profileService);
+            UpdateLotterySummary();
             UpdateGachaSummary(historyService);
             RefreshHistoryAndStatistics(historyService);
         }
@@ -942,6 +1033,59 @@ namespace IslandCaller.ViewModels
                 .ToList();
 
             Settings.Instance.General.GuaranteeWeightListJson = JsonSerializer.Serialize(list);
+        }
+
+        private ObservableCollection<LotteryPrizeModel> BuildLotteryPrizeList(LotteryService lotteryService)
+        {
+            var items = lotteryService.GetConfiguredPrizes()
+                .Select(x => new LotteryPrizeModel
+                {
+                    Name = x.Name,
+                    WinnerCount = x.WinnerCount
+                })
+                .ToList();
+
+            return new ObservableCollection<LotteryPrizeModel>(items);
+        }
+
+        private void SaveLotteryPrizes()
+        {
+            var list = LotteryService.NormalizePrizeItems(LotteryPrizeList.Select(x => new LotteryPrizeItem
+            {
+                Name = x.Name,
+                WinnerCount = x.WinnerCount
+            }));
+
+            Settings.Instance.General.LotteryPrizeListJson = JsonSerializer.Serialize(list);
+        }
+
+        private void UpdateLotterySummary()
+        {
+            var list = LotteryPrizeList
+                .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                .Select(x => $"{x.Name.Trim()} x{x.WinnerCount}")
+                .ToList();
+
+            LotterySummaryText = list.Count == 0
+                ? "抽奖预设为空。请先添加奖项和人数，或通过 URI 传入 prize/count。"
+                : $"当前已配置 {list.Count} 个奖项：{string.Join("；", list)}。";
+        }
+
+        private void LotteryPrize_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (sender is not LotteryPrizeModel prize)
+            {
+                return;
+            }
+
+            if (prize.WinnerCount < 1)
+            {
+                prize.WinnerCount = 1;
+                return;
+            }
+
+            SaveLotteryPrizes();
+            UpdateLotterySummary();
         }
 
         private void UpdateGuaranteeMemberOptions(ProfileService profileService)

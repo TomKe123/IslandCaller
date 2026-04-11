@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ci="clr-namespace:ClassIsland.Core.Controls;assembly=ClassIsland.Core"
+        xmlns:fa="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
+        mc:Ignorable="d"
+        x:Class="IslandCaller.Views.LotteryWindow"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        ExtendClientAreaToDecorationsHint="True"
+        Background="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+        SystemDecorations="Full"
+        TransparencyLevelHint="Mica"
+        ShowInTaskbar="False"
+        Topmost="True"
+        CanResize="False"
+        Height="360"
+        Width="560"
+        WindowStartupLocation="CenterScreen">
+  <Panel Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+    <StackPanel Margin="24" Spacing="12">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+        <ci:FluentIcon Glyph="&#xE7BF;" FontSize="22" Grid.Column="0"/>
+        <TextBlock Grid.Column="1"
+                   Margin="6,0,0,0"
+                   VerticalAlignment="Center"
+                   FontFamily="HarmonyOS Sans SC"
+                   FontSize="18"
+                   Text="IslandCaller 抽奖"/>
+      </Grid>
+
+      <fa:SettingsExpander Header="奖项" Description="选择预设奖项或直接修改奖项名称">
+        <fa:SettingsExpanderItem>
+          <StackPanel Spacing="8">
+            <ComboBox ItemsSource="{Binding PrizeOptions}"
+                      SelectedItem="{Binding SelectedPrize, Mode=TwoWay}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Name}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBox Text="{Binding PrizeName, Mode=TwoWay}" Watermark="抽奖结果"/>
+          </StackPanel>
+        </fa:SettingsExpanderItem>
+      </fa:SettingsExpander>
+
+      <fa:SettingsExpander Header="人数" Description="设置本次抽奖人数">
+        <fa:SettingsExpander.Footer>
+          <TextBlock VerticalAlignment="Center" Text="{Binding WinnerCount}"/>
+        </fa:SettingsExpander.Footer>
+        <fa:SettingsExpanderItem>
+          <Slider Minimum="1"
+                  Maximum="20"
+                  TickFrequency="1"
+                  IsSnapToTickEnabled="True"
+                  Classes="auto-tooltip"
+                  Value="{Binding WinnerCount, Mode=TwoWay}"/>
+        </fa:SettingsExpanderItem>
+      </fa:SettingsExpander>
+
+      <TextBlock Text="抽奖结果" FontWeight="SemiBold"/>
+      <Border Padding="12" MinHeight="84" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+        <TextBlock Text="{Binding LotteryResultText}" TextWrapping="Wrap"/>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,6,0,0">
+        <Button Grid.Column="0" Click="CancelButton_Click">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <ci:FluentIcon Glyph="&#xE671;" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Center" Text="关闭"/>
+          </Grid>
+        </Button>
+        <Button Grid.Column="1" Classes="accent" Click="DrawButton_Click">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <ci:FluentIcon Glyph="&#xE7C5;" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Center" Text="开始抽奖"/>
+          </Grid>
+        </Button>
+      </Grid>
+    </StackPanel>
+  </Panel>
+</Window>

@@ -86,6 +86,46 @@ namespace IslandCaller.Services
             return GetRandomStudentResult().Name;
         }
 
+        internal IReadOnlyList<string> DrawLotteryWinners(int count)
+        {
+            if (count <= 0 || Persons.Count == 0)
+            {
+                return [];
+            }
+
+            var pool = Persons
+                .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                .DistinctBy(p => p.NormalizedName)
+                .ToList();
+            if (pool.Count == 0)
+            {
+                return [];
+            }
+
+            int targetCount = Math.Min(count, pool.Count);
+            var winners = new List<string>(targetCount);
+
+            while (winners.Count < targetCount && pool.Count > 0)
+            {
+                var winner = PickLotteryPerson(pool);
+                if (winner == null)
+                {
+                    break;
+                }
+
+                winners.Add(winner.Name);
+                pool.Remove(winner);
+            }
+
+            foreach (var winner in winners)
+            {
+                historyService.Add(winner);
+            }
+
+            ComputeWeightsForAllStudents();
+            return winners;
+        }
+
         internal DrawResult GetRandomStudentResult()
         {
             if (IsGachaModeActive())
@@ -296,6 +336,33 @@ namespace IslandCaller.Services
             foreach (var person in persons)
             {
                 cumulative += Math.Max(0.01, person.ManualWeight);
+                if (r < cumulative)
+                {
+                    return person;
+                }
+            }
+
+            return persons.OrderBy(x => x.Id).FirstOrDefault();
+        }
+
+        private static Person? PickLotteryPerson(IReadOnlyList<Person> persons)
+        {
+            if (persons.Count == 0)
+            {
+                return null;
+            }
+
+            double totalWeight = persons.Sum(x => Math.Max(0.01, x.Weight));
+            if (totalWeight <= 0)
+            {
+                return persons.OrderBy(x => x.Id).FirstOrDefault();
+            }
+
+            double r = GetTrueRandomDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var person in persons)
+            {
+                cumulative += Math.Max(0.01, person.Weight);
                 if (r < cumulative)
                 {
                     return person;

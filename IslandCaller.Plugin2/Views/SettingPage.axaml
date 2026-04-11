@@ -55,6 +55,43 @@
                 </fa:SettingsExpanderItem>
             </fa:SettingsExpander>
 
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE7BF;}" Header="抽奖设置" Description="配置抽奖奖项和人数，并支持 URI 调用">
+                <fa:SettingsExpanderItem>
+                    <StackPanel Spacing="8">
+                        <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding LotterySummaryText}"/>
+                        <DataGrid ItemsSource="{Binding LotteryPrizeList}" RowHeight="40" MaxHeight="240">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="奖项" Binding="{Binding Name, Mode=TwoWay}" Width="*"/>
+                                <DataGridTextColumn Header="人数" Binding="{Binding WinnerCount, Mode=TwoWay}" Width="120"/>
+                                <DataGridTemplateColumn Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Command="{Binding DataContext.RemoveLotteryPrizeRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Red"
+                                                    Margin="6,0">
+                                                <ci:FluentIcon Glyph="&#xE61D;"/>
+                                            </Button>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Command="{Binding AddLotteryPrizeCommand}">
+                                <ci:IconText Glyph="&#xE00D;" Text="添加奖项"/>
+                            </Button>
+                            <Button Command="{Binding OpenLotteryWindowCommand}">
+                                <ci:IconText Glyph="&#xE7C5;" Text="打开抽奖窗口"/>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Opacity="0.72"
+                                   TextWrapping="Wrap"
+                                   Text="URI：classisland://plugins/IslandCaller/Lottery/GUI 或 classisland://plugins/IslandCaller/Lottery/Draw?prize=一等奖&amp;count=1"/>
+                    </StackPanel>
+                </fa:SettingsExpanderItem>
+            </fa:SettingsExpander>
+
             <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE8A5;}" Header="保底模式" Description="启用原神角色池式保底；关闭时使用默认公平抽选算法">
                 <fa:SettingsExpander.Footer>
                     <ToggleSwitch IsChecked="{Binding IsGachaEnabled, Mode=TwoWay}"/>
