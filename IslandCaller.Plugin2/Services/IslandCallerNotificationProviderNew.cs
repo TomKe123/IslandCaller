@@ -24,6 +24,18 @@ public class IslandCallerNotificationProviderNew(ILessonsService lessonsService,
             return Task.CompletedTask;
         }
 
+        if (stunum == 1)
+        {
+            var single = coreService.GetRandomStudentResult();
+            if (string.IsNullOrWhiteSpace(single.Name) || string.Equals(single.Name, "Error", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.CompletedTask;
+            }
+
+            ShowNotification(BuildSingleNameRequest(single.Name, ToNotificationColor(single.Type)));
+            return Task.CompletedTask;
+        }
+
         var selectedStudents = new List<CoreService.DrawResult>(stunum);
         for (int i = 0; i < stunum; i++)
         {

@@ -10,16 +10,18 @@ namespace IslandCaller.Services
     {
         private readonly ProfileService profileService;
         private readonly HistoryService historyService;
+        private readonly UsbAuthService usbAuthService;
         private readonly ILogger<CoreService> logger;
         private readonly Status status;
         private const double CapturedRadianceChanceOnFeaturedMiss = 0.1;
         private bool settingsCacheDirty = true;
         private GachaSettingsSnapshot gachaSettingsSnapshot = GachaSettingsSnapshot.Empty;
 
-        public CoreService(ProfileService profileService, HistoryService historyService, ILogger<CoreService> logger, Status status)
+        public CoreService(ProfileService profileService, HistoryService historyService, UsbAuthService usbAuthService, ILogger<CoreService> logger, Status status)
         {
             this.profileService = profileService;
             this.historyService = historyService;
+            this.usbAuthService = usbAuthService;
             this.logger = logger;
             this.status = status;
             Settings.Instance.General.PropertyChanged += OnSettingsChanged;
@@ -86,7 +88,7 @@ namespace IslandCaller.Services
 
         internal DrawResult GetRandomStudentResult()
         {
-            if (GetGachaSettingsSnapshot().Enabled)
+            if (IsGachaModeActive())
             {
                 return GetRandomCharacterPoolResult();
             }
@@ -376,7 +378,7 @@ namespace IslandCaller.Services
 
         private void ComputeWeightsForAllStudents()
         {
-            if (GetGachaSettingsSnapshot().Enabled)
+            if (IsGachaModeActive())
             {
                 foreach (var person in Persons)
                 {
@@ -394,6 +396,11 @@ namespace IslandCaller.Services
                 double weight = ComputeSingleWeight(person.ManualWeight, lastHitStep, nHist, avgHist);
                 person.Weight = weight;
             }
+        }
+
+        private bool IsGachaModeActive()
+        {
+            return GetGachaSettingsSnapshot().Enabled && usbAuthService.CanUseGachaMode();
         }
 
         private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)

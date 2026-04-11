@@ -122,6 +122,9 @@ namespace IslandCaller.Models
         public GachaSetting()
         {
             _enabled = false;
+            _requireUsbAuth = false;
+            _usbAuthFileName = "IslandCaller.auth";
+            _usbAuthToken = string.Empty;
             _fiveStarBaseRate = 0.006;
             _fiveStarSoftPityStart = 74;
             _fiveStarHardPity = 90;
@@ -139,6 +142,27 @@ namespace IslandCaller.Models
         {
             get => _enabled;
             set { if (_enabled != value) { _enabled = value; OnPropertyChanged(nameof(Enabled)); } }
+        }
+
+        private bool _requireUsbAuth;
+        public bool RequireUsbAuth
+        {
+            get => _requireUsbAuth;
+            set { if (_requireUsbAuth != value) { _requireUsbAuth = value; OnPropertyChanged(nameof(RequireUsbAuth)); } }
+        }
+
+        private string _usbAuthFileName;
+        public string UsbAuthFileName
+        {
+            get => _usbAuthFileName;
+            set { if (_usbAuthFileName != value) { _usbAuthFileName = value; OnPropertyChanged(nameof(UsbAuthFileName)); } }
+        }
+
+        private string _usbAuthToken;
+        public string UsbAuthToken
+        {
+            get => _usbAuthToken;
+            set { if (_usbAuthToken != value) { _usbAuthToken = value; OnPropertyChanged(nameof(UsbAuthToken)); } }
         }
 
         private double _fiveStarBaseRate;

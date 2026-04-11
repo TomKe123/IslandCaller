@@ -162,6 +162,9 @@ namespace IslandCaller.Models
         private static void SaveGachaSettings(RegistryKey? gachaKey)
         {
             gachaKey?.SetValue("Enabled", Instance.Gacha.Enabled);
+            gachaKey?.SetValue("RequireUsbAuth", Instance.Gacha.RequireUsbAuth);
+            gachaKey?.SetValue("UsbAuthFileName", Instance.Gacha.UsbAuthFileName);
+            gachaKey?.SetValue("UsbAuthToken", Instance.Gacha.UsbAuthToken);
             gachaKey?.SetValue("FiveStarBaseRate", Instance.Gacha.FiveStarBaseRate);
             gachaKey?.SetValue("FiveStarSoftPityStart", Instance.Gacha.FiveStarSoftPityStart);
             gachaKey?.SetValue("FiveStarHardPity", Instance.Gacha.FiveStarHardPity);
@@ -177,6 +180,9 @@ namespace IslandCaller.Models
         private static void LoadGachaSettings(RegistryKey? gachaKey)
         {
             Instance.Gacha.Enabled = Convert.ToBoolean(gachaKey?.GetValue("Enabled") ?? false);
+            Instance.Gacha.RequireUsbAuth = Convert.ToBoolean(gachaKey?.GetValue("RequireUsbAuth") ?? false);
+            Instance.Gacha.UsbAuthFileName = UsbAuthService.NormalizeAuthFileName(gachaKey?.GetValue("UsbAuthFileName") as string);
+            Instance.Gacha.UsbAuthToken = (gachaKey?.GetValue("UsbAuthToken") as string) ?? string.Empty;
             Instance.Gacha.FiveStarBaseRate = Convert.ToDouble(gachaKey?.GetValue("FiveStarBaseRate") ?? 0.006);
             Instance.Gacha.FiveStarSoftPityStart = Convert.ToInt32(gachaKey?.GetValue("FiveStarSoftPityStart") ?? 74);
             Instance.Gacha.FiveStarHardPity = Convert.ToInt32(gachaKey?.GetValue("FiveStarHardPity") ?? 90);

@@ -3,6 +3,7 @@ using ClassIsland.Core.Abstractions.Services;
 using IslandCaller.Views;
 using ClassIsland.Shared.Enums;
 using IslandCaller.Models;
+using Avalonia.Threading;
 
 namespace IslandCaller.Services.IslandCallerService
 {
@@ -44,28 +45,54 @@ namespace IslandCaller.Services.IslandCallerService
             };
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Simple",
-                async args =>
+                args =>
                 {
-                    await NotificationProvider.RandomCall(1);
+                    TriggerUriSimpleCall(1);
                 }
             );
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Advanced/GUI",
                 args =>
                 {
-                    new PersonalCall().Show();
+                    TriggerUriAdvancedCall();
                 }
             );
             status.IslandCallerServiceInitialized = true;
         }
 
-        public async void ShowRandomStudent(int stunum)
+        public void TriggerUriSimpleCall(int stunum)
+        {
+            if (stunum <= 0)
+            {
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() => _ = ShowRandomStudentAsync(stunum), DispatcherPriority.Send);
+        }
+
+        public void TriggerUriAdvancedCall()
+        {
+            Dispatcher.UIThread.Post(static () => new PersonalCall().Show(), DispatcherPriority.Send);
+        }
+
+        public void ShowRandomStudent(int stunum)
+        {
+            _ = ShowRandomStudentAsync(stunum);
+        }
+
+        private async Task ShowRandomStudentAsync(int stunum)
         {
             if(Status.IsPluginReady == false) return;
             Status.OccupationDisable = false;
-            await NotificationProvider.RandomCall(stunum);
-            await Task.Delay(stunum * 2000 + 1000);
-            Status.OccupationDisable = true;
+            try
+            {
+                await NotificationProvider.RandomCall(stunum);
+                await Task.Delay(stunum * 2000 + 1000);
+            }
+            finally
+            {
+                Status.OccupationDisable = true;
+            }
         }
     }
 }

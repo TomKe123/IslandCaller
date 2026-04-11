@@ -72,6 +72,48 @@ namespace IslandCaller.ViewModels
             set => this.RaiseAndSetIfChanged(ref _isGachaEnabled, value);
         }
 
+        private bool _isUsbAuthRequired;
+        public bool IsUsbAuthRequired
+        {
+            get => _isUsbAuthRequired;
+            set => this.RaiseAndSetIfChanged(ref _isUsbAuthRequired, value);
+        }
+
+        private string _usbAuthFileName = string.Empty;
+        public string UsbAuthFileName
+        {
+            get => _usbAuthFileName;
+            set => this.RaiseAndSetIfChanged(ref _usbAuthFileName, value);
+        }
+
+        private string _usbAuthToken = string.Empty;
+        public string UsbAuthToken
+        {
+            get => _usbAuthToken;
+            set => this.RaiseAndSetIfChanged(ref _usbAuthToken, value);
+        }
+
+        private string _usbAuthStatusSummary = string.Empty;
+        public string UsbAuthStatusSummary
+        {
+            get => _usbAuthStatusSummary;
+            set => this.RaiseAndSetIfChanged(ref _usbAuthStatusSummary, value);
+        }
+
+        private string _usbAuthStatusText = string.Empty;
+        public string UsbAuthStatusText
+        {
+            get => _usbAuthStatusText;
+            set => this.RaiseAndSetIfChanged(ref _usbAuthStatusText, value);
+        }
+
+        private bool _isUsbAuthVerified;
+        public bool IsUsbAuthVerified
+        {
+            get => _isUsbAuthVerified;
+            set => this.RaiseAndSetIfChanged(ref _isUsbAuthVerified, value);
+        }
+
         private double _fiveStarBaseRate;
         public double FiveStarBaseRate
         {
@@ -216,6 +258,11 @@ namespace IslandCaller.ViewModels
             }
 
             GuaranteeWeightList.Remove(row);
+        });
+
+        public ICommand RefreshUsbAuthCommand => new RelayCommand(() =>
+        {
+            RefreshUsbAuthStatus(IAppHost.GetService<HistoryService>());
         });
 
         public class StatisticsItem : ReactiveObject
@@ -378,6 +425,7 @@ namespace IslandCaller.ViewModels
             ProfileService profileService = IAppHost.GetService<ProfileService>();
             HistoryService historyService = IAppHost.GetService<HistoryService>();
             CoreService coreService = IAppHost.GetService<CoreService>();
+            UsbAuthService usbAuthService = IAppHost.GetService<UsbAuthService>();
             Plugin plugin = IAppHost.GetService<Plugin>();
 
             // 初始化默认值
@@ -389,6 +437,9 @@ namespace IslandCaller.ViewModels
             GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
             PacerThreshold = Settings.Instance.General.PacerThreshold;
             IsGachaEnabled = Settings.Instance.Gacha.Enabled;
+            IsUsbAuthRequired = Settings.Instance.Gacha.RequireUsbAuth;
+            UsbAuthFileName = UsbAuthService.NormalizeAuthFileName(Settings.Instance.Gacha.UsbAuthFileName);
+            UsbAuthToken = Settings.Instance.Gacha.UsbAuthToken;
             FiveStarBaseRate = Settings.Instance.Gacha.FiveStarBaseRate;
             FiveStarSoftPityStart = Settings.Instance.Gacha.FiveStarSoftPityStart;
             FiveStarHardPity = Settings.Instance.Gacha.FiveStarHardPity;
@@ -417,6 +468,7 @@ namespace IslandCaller.ViewModels
                 IsFeatured = m.IsFeatured
             });
             ProfileList = new ObservableCollection<StudentModel>(profile);
+            ApplyUsbAuthSnapshot(usbAuthService.RefreshStatus(forceRefresh: true));
 
             this.PropertyChanged += (sender, args) =>
             {
@@ -465,9 +517,41 @@ namespace IslandCaller.ViewModels
                 }
                 else if (args.PropertyName == nameof(IsGachaEnabled))
                 {
+                    if (IsGachaEnabled)
+                    {
+                        var authSnapshot = RefreshUsbAuthStatus(historyService);
+                        if (authSnapshot.IsRequired && !authSnapshot.IsVerified)
+                        {
+                            IsGachaEnabled = false;
+                            return;
+                        }
+                    }
+
                     Settings.Instance.Gacha.Enabled = IsGachaEnabled;
                     RefreshHistoryAndStatistics(historyService);
                     UpdateGachaSummary(historyService);
+                }
+                else if (args.PropertyName == nameof(IsUsbAuthRequired))
+                {
+                    Settings.Instance.Gacha.RequireUsbAuth = IsUsbAuthRequired;
+                    HandleUsbAuthConfigurationChanged(historyService);
+                }
+                else if (args.PropertyName == nameof(UsbAuthFileName))
+                {
+                    string normalized = UsbAuthService.NormalizeAuthFileName(UsbAuthFileName);
+                    Settings.Instance.Gacha.UsbAuthFileName = normalized;
+                    if (!string.Equals(UsbAuthFileName, normalized, StringComparison.Ordinal))
+                    {
+                        UsbAuthFileName = normalized;
+                        return;
+                    }
+
+                    HandleUsbAuthConfigurationChanged(historyService);
+                }
+                else if (args.PropertyName == nameof(UsbAuthToken))
+                {
+                    Settings.Instance.Gacha.UsbAuthToken = UsbAuthToken ?? string.Empty;
+                    HandleUsbAuthConfigurationChanged(historyService);
                 }
                 else if (args.PropertyName == nameof(FiveStarBaseRate))
                 {
@@ -657,6 +741,7 @@ namespace IslandCaller.ViewModels
 
         public void RefreshHistoryAndStatistics(HistoryService historyService)
         {
+            ApplyUsbAuthSnapshot(IAppHost.GetService<UsbAuthService>().RefreshStatus());
             var snapshot = historyService.GetHistorySnapshot().OrderByDescending(x => x.LongTermCount).ThenBy(x => x.Name).ToList();
             var totalLongTerm = historyService.GetTotalLongTermCallCount();
             var average = historyService.GetAverageLongTermCount();
@@ -678,7 +763,8 @@ namespace IslandCaller.ViewModels
             StatisticsList.Clear();
             StatisticsList.Add(new StatisticsItem { Metric = "总点名次数（长期）", Value = totalLongTerm.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "全班长期平均点名次数", Value = average.ToString("F2") });
-            StatisticsList.Add(new StatisticsItem { Metric = "保底模式", Value = IsGachaEnabled ? "开启" : "关闭" });
+            StatisticsList.Add(new StatisticsItem { Metric = "保底模式", Value = GetGachaModeStatusText() });
+            StatisticsList.Add(new StatisticsItem { Metric = "U盘验证", Value = UsbAuthStatusSummary });
             StatisticsList.Add(new StatisticsItem { Metric = "五星水位", Value = pityState.FiveStarPity.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "四星水位", Value = pityState.FourStarPity.ToString() });
             StatisticsList.Add(new StatisticsItem { Metric = "五星大保底", Value = pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否" });
@@ -705,14 +791,56 @@ namespace IslandCaller.ViewModels
             int nonFiveStarCount = ProfileList.Count - fiveStarCount;
             string featuredFiveStar = string.IsNullOrWhiteSpace(pityState.FeaturedFiveStarName) ? "未生成" : pityState.FeaturedFiveStarName;
             string featuredFourStars = pityState.FeaturedFourStarNames.Count == 0 ? "未生成" : string.Join("、", pityState.FeaturedFourStarNames);
+            string gachaModeStatus = GetGachaModeStatusText();
 
             GachaSummaryText =
-                $"保底模式：{(IsGachaEnabled ? "开启" : "关闭")}；" +
+                $"保底模式：{gachaModeStatus}；" +
+                $"U盘验证：{UsbAuthStatusSummary}；" +
                 $"五星候选 {fiveStarCount} 人，非五星 {nonFiveStarCount} 人；" +
                 $"今日五星 UP：{featuredFiveStar}；今日四星 UP：{featuredFourStars}；" +
                 $"当前水位：五星 {pityState.FiveStarPity}/{Math.Max(1, FiveStarHardPity)}，四星 {pityState.FourStarPity}/{Math.Max(1, FourStarHardPity)}；" +
                 $"五星大保底={(pityState.IsFiveStarFeaturedGuaranteed ? "是" : "否")}，四星大保底={(pityState.IsFourStarFeaturedGuaranteed ? "是" : "否")}；" +
                 $"五星小保底歪后额外有 {0.1:P0} 概率触发捕获明光，累计触发 {pityState.CapturedRadianceCount} 次。";
+        }
+
+        private void HandleUsbAuthConfigurationChanged(HistoryService historyService)
+        {
+            var snapshot = RefreshUsbAuthStatus(historyService);
+            if (IsGachaEnabled && snapshot.IsRequired && !snapshot.IsVerified)
+            {
+                IsGachaEnabled = false;
+            }
+        }
+
+        private UsbAuthSnapshot RefreshUsbAuthStatus(HistoryService historyService)
+        {
+            var snapshot = IAppHost.GetService<UsbAuthService>().RefreshStatus(forceRefresh: true);
+            ApplyUsbAuthSnapshot(snapshot);
+            UpdateGachaSummary(historyService);
+            RefreshHistoryAndStatistics(historyService);
+            return snapshot;
+        }
+
+        private void ApplyUsbAuthSnapshot(UsbAuthSnapshot snapshot)
+        {
+            IsUsbAuthVerified = snapshot.IsVerified;
+            UsbAuthStatusSummary = snapshot.Summary;
+            UsbAuthStatusText = snapshot.Detail;
+        }
+
+        private string GetGachaModeStatusText()
+        {
+            if (!IsGachaEnabled)
+            {
+                return "关闭";
+            }
+
+            if (IsUsbAuthRequired && !IsUsbAuthVerified)
+            {
+                return "未生效（等待验证）";
+            }
+
+            return "开启";
         }
 
         private void UpdateGuaranteeSummary(ProfileService profileService)
