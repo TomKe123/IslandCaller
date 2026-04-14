@@ -1,85 +1,75 @@
-﻿using IslandCaller.Services.NotificationProvidersNew;
+using Avalonia.Threading;
 using ClassIsland.Core.Abstractions.Services;
-using IslandCaller.Views;
 using ClassIsland.Shared.Enums;
 using IslandCaller.Models;
-using Avalonia.Threading;
-using System.Collections.Specialized;
+using IslandCaller.Services.NotificationProvidersNew;
+using IslandCaller.Views;
 
 namespace IslandCaller.Services.IslandCallerService
 {
     public class IslandCallerService
     {
-        private ILessonsService LessonsService { get; }
-        private CoreService CoreService {  get; }
         private LotteryService LotteryService { get; }
         private IslandCallerNotificationProviderNew NotificationProvider { get; }
-        private Plugin Plugin { get; }
-        public Status Status { get; set; }
-        public IslandCallerService(Plugin plugin, 
-                                    IUriNavigationService uriNavigationService, 
-                                    ILessonsService lessonsService,
-                                    HistoryService historyService,
-                                    CoreService coreService,
-                                    LotteryService lotteryService,
-                                    IslandCallerNotificationProviderNew notificationProvider,
-                                    Status status
-            )
+        public Status Status { get; }
+
+        public IslandCallerService(
+            IUriNavigationService uriNavigationService,
+            ILessonsService lessonsService,
+            HistoryService historyService,
+            LotteryService lotteryService,
+            IslandCallerNotificationProviderNew notificationProvider,
+            Status status)
         {
-            
-            LessonsService = lessonsService;
-            CoreService = coreService;
             LotteryService = lotteryService;
             NotificationProvider = notificationProvider;
-            Plugin = plugin;
             Status = status;
+
             status.IslandCallerServiceInitialized = false;
-            Status.IsTimeStatusAvailable = !(Settings.Instance.General.BreakDisable & lessonsService.CurrentState == TimeState.Breaking);
-            lessonsService.CurrentTimeStateChanged += (s, e) =>
+            UpdateTimeStatusAvailability(lessonsService);
+
+            lessonsService.CurrentTimeStateChanged += (_, _) =>
             {
                 historyService.ClearThisLessonHistory();
-                Status.IsTimeStatusAvailable = !(Settings.Instance.General.BreakDisable & lessonsService.CurrentState == TimeState.Breaking);
+                UpdateTimeStatusAvailability(lessonsService);
             };
-            Settings.Instance.General.PropertyChanged += (s, e) =>
+
+            Settings.Instance.General.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(Settings.Instance.General.BreakDisable))
                 {
-                    Status.IsTimeStatusAvailable = !(Settings.Instance.General.BreakDisable & lessonsService.CurrentState == TimeState.Breaking);
+                    UpdateTimeStatusAvailability(lessonsService);
                 }
             };
+
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Simple",
                 args =>
                 {
-                    TriggerUriSimpleCall(1);
-                }
-            );
+                    var request = ParseUriRequest(args.Uri, args.ChildrenPathPatterns);
+                    TriggerUriSimpleCall(request.ResolveSimpleCallStudentCount());
+                });
+
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Advanced/GUI",
-                args =>
-                {
-                    TriggerUriAdvancedCall();
-                }
-            );
+                _ => TriggerUriAdvancedCall());
+
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Lottery/GUI",
                 args =>
                 {
-                    string? prizeName = GetUriQueryValue(args.Uri, "prize");
-                    int? winnerCount = TryGetPositiveInt(args.Uri, "count");
-                    bool autoDraw = TryGetBoolean(args.Uri, "auto");
-                    TriggerUriLotteryGuiCall(prizeName, winnerCount, autoDraw);
-                }
-            );
+                    var request = ParseUriRequest(args.Uri, args.ChildrenPathPatterns);
+                    TriggerUriLotteryGuiCall(request.PrizeName, request.WinnerCount, request.AutoDraw);
+                });
+
             uriNavigationService.HandlePluginsNavigation(
                 "IslandCaller/Lottery/Draw",
                 args =>
                 {
-                    string? prizeName = GetUriQueryValue(args.Uri, "prize");
-                    int? winnerCount = TryGetPositiveInt(args.Uri, "count");
-                    TriggerUriLotteryDrawCall(prizeName, winnerCount);
-                }
-            );
+                    var request = ParseUriRequest(args.Uri, args.ChildrenPathPatterns);
+                    TriggerUriLotteryDrawCall(request.PrizeName, request.WinnerCount);
+                });
+
             status.IslandCallerServiceInitialized = true;
         }
 
@@ -90,30 +80,30 @@ namespace IslandCaller.Services.IslandCallerService
                 return;
             }
 
-            Dispatcher.UIThread.Post(() => _ = ShowRandomStudentAsync(stunum), DispatcherPriority.Send);
+            RunOnUiThread(() => _ = ShowRandomStudentAsync(stunum));
         }
 
         public void TriggerUriAdvancedCall()
         {
-            Dispatcher.UIThread.Post(static () => new PersonalCall().Show(), DispatcherPriority.Send);
+            RunOnUiThread(static () => new PersonalCall().Show());
         }
 
         public void TriggerUriLotteryGuiCall(string? prizeName = null, int? winnerCount = null, bool autoDraw = false)
         {
-            Dispatcher.UIThread.Post(() =>
+            RunOnUiThread(() =>
             {
                 var resolvedPrize = LotteryService.ResolvePrize(prizeName, winnerCount);
                 new LotteryWindow(resolvedPrize.Name, resolvedPrize.WinnerCount, autoDraw).Show();
-            }, DispatcherPriority.Send);
+            });
         }
 
         public void TriggerUriLotteryDrawCall(string? prizeName = null, int? winnerCount = null)
         {
-            Dispatcher.UIThread.Post(() =>
+            RunOnUiThread(() =>
             {
                 var resolvedPrize = LotteryService.ResolvePrize(prizeName, winnerCount);
                 LotteryService.DrawLottery(resolvedPrize.Name, resolvedPrize.WinnerCount);
-            }, DispatcherPriority.Send);
+            });
         }
 
         public void ShowRandomStudent(int stunum)
@@ -123,7 +113,11 @@ namespace IslandCaller.Services.IslandCallerService
 
         private async Task ShowRandomStudentAsync(int stunum)
         {
-            if(Status.IsPluginReady == false) return;
+            if (Status.IsPluginReady == false)
+            {
+                return;
+            }
+
             Status.OccupationDisable = false;
             try
             {
@@ -136,45 +130,106 @@ namespace IslandCaller.Services.IslandCallerService
             }
         }
 
-        private static string? GetUriQueryValue(Uri uri, string key)
+        private void UpdateTimeStatusAvailability(ILessonsService lessonsService)
         {
-            var values = ParseQuery(uri);
-            return values[key];
+            Status.IsTimeStatusAvailable = !(Settings.Instance.General.BreakDisable & lessonsService.CurrentState == TimeState.Breaking);
         }
 
-        private static int? TryGetPositiveInt(Uri uri, string key)
+        private static void RunOnUiThread(Action action)
         {
-            string? raw = GetUriQueryValue(uri, key);
-            return int.TryParse(raw, out int value) && value > 0 ? value : null;
-        }
-
-        private static bool TryGetBoolean(Uri uri, string key)
-        {
-            string? raw = GetUriQueryValue(uri, key);
-            return string.Equals(raw, "1", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(raw, "yes", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static NameValueCollection ParseQuery(Uri uri)
-        {
-            NameValueCollection values = new();
-            string rawQuery = uri.Query;
-            if (string.IsNullOrWhiteSpace(rawQuery))
+            if (Dispatcher.UIThread.CheckAccess())
             {
-                return values;
+                action();
+                return;
             }
 
-            string query = rawQuery.TrimStart('?');
-            foreach (string segment in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            Dispatcher.UIThread.Post(action, DispatcherPriority.Send);
+        }
+
+        private static UriRequest ParseUriRequest(Uri uri, IEnumerable<string>? childrenPathPatterns)
+        {
+            string? prizeName = null;
+            int? winnerCount = null;
+            bool autoDraw = false;
+
+            ReadOnlySpan<char> query = uri.Query.AsSpan();
+            if (!query.IsEmpty && query[0] == '?')
             {
-                string[] pair = segment.Split('=', 2);
-                string key = Uri.UnescapeDataString(pair[0]);
-                string value = pair.Length > 1 ? Uri.UnescapeDataString(pair[1]) : string.Empty;
-                values[key] = value;
+                query = query[1..];
             }
 
-            return values;
+            while (!query.IsEmpty)
+            {
+                int segmentSeparatorIndex = query.IndexOf('&');
+                ReadOnlySpan<char> segment = segmentSeparatorIndex >= 0 ? query[..segmentSeparatorIndex] : query;
+                query = segmentSeparatorIndex >= 0 ? query[(segmentSeparatorIndex + 1)..] : ReadOnlySpan<char>.Empty;
+
+                if (segment.IsEmpty)
+                {
+                    continue;
+                }
+
+                int valueSeparatorIndex = segment.IndexOf('=');
+                ReadOnlySpan<char> rawKey = valueSeparatorIndex >= 0 ? segment[..valueSeparatorIndex] : segment;
+                ReadOnlySpan<char> rawValue = valueSeparatorIndex >= 0 ? segment[(valueSeparatorIndex + 1)..] : ReadOnlySpan<char>.Empty;
+
+                string key = Uri.UnescapeDataString(rawKey.ToString());
+                string value = Uri.UnescapeDataString(rawValue.ToString());
+
+                if (string.Equals(key, "prize", StringComparison.OrdinalIgnoreCase))
+                {
+                    prizeName = value;
+                    continue;
+                }
+
+                if (string.Equals(key, "count", StringComparison.OrdinalIgnoreCase))
+                {
+                    winnerCount = TryParsePositiveInt(value, out int parsedCount) ? parsedCount : null;
+                    continue;
+                }
+
+                if (string.Equals(key, "auto", StringComparison.OrdinalIgnoreCase))
+                {
+                    autoDraw = IsTruthyValue(value);
+                }
+            }
+
+            return new UriRequest(childrenPathPatterns?.FirstOrDefault(), prizeName, winnerCount, autoDraw);
+        }
+
+        private static bool TryParsePositiveInt(string? rawValue, out int value)
+        {
+            if (int.TryParse(rawValue, out value) && value > 0)
+            {
+                return true;
+            }
+
+            value = 0;
+            return false;
+        }
+
+        private static bool IsTruthyValue(string? rawValue)
+        {
+            return string.Equals(rawValue, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rawValue, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rawValue, "yes", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private readonly record struct UriRequest(
+            string? FirstChildPathPattern,
+            string? PrizeName,
+            int? WinnerCount,
+            bool AutoDraw)
+        {
+            public int ResolveSimpleCallStudentCount()
+            {
+                if (TryParsePositiveInt(FirstChildPathPattern, out int childPathCount))
+                {
+                    return childPathCount;
+                }
+
+                return WinnerCount.GetValueOrDefault(1);
+            }
         }
     }
 }
