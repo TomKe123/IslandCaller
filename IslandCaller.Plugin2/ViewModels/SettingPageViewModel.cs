@@ -4,6 +4,7 @@ using IslandCaller.Models;
 using IslandCaller.Services;
 using IslandCaller.Views;
 using ReactiveUI;
+using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Security.Cryptography;
@@ -15,6 +16,13 @@ namespace IslandCaller.ViewModels
 {
     public class SettingPageViewModel : ReactiveObject
     {
+        private readonly ProfileService _profileService;
+        private readonly HistoryService _historyService;
+        private readonly CoreService _coreService;
+        private readonly LotteryService _lotteryService;
+        private readonly UsbAuthService _usbAuthService;
+        private readonly Plugin _plugin;
+
         // 基本设置
         private bool _isBreakDisable;
         public bool IsBreakDisable
@@ -212,7 +220,17 @@ namespace IslandCaller.ViewModels
         public ObservableCollection<GuaranteeWeightModel> GuaranteeWeightList
         {
             get => _guaranteeWeightList;
-            set => this.RaiseAndSetIfChanged(ref _guaranteeWeightList, value);
+            set
+            {
+                if (ReferenceEquals(_guaranteeWeightList, value))
+                {
+                    return;
+                }
+
+                DetachGuaranteeWeightCollection(_guaranteeWeightList);
+                this.RaiseAndSetIfChanged(ref _guaranteeWeightList, value);
+                AttachGuaranteeWeightCollection(_guaranteeWeightList);
+            }
         }
 
         private ObservableCollection<string> _guaranteeMemberOptions = [];
@@ -264,7 +282,17 @@ namespace IslandCaller.ViewModels
         public ObservableCollection<LotteryPrizeModel> LotteryPrizeList
         {
             get => _lotteryPrizeList;
-            set => this.RaiseAndSetIfChanged(ref _lotteryPrizeList, value);
+            set
+            {
+                if (ReferenceEquals(_lotteryPrizeList, value))
+                {
+                    return;
+                }
+
+                DetachLotteryPrizeCollection(_lotteryPrizeList);
+                this.RaiseAndSetIfChanged(ref _lotteryPrizeList, value);
+                AttachLotteryPrizeCollection(_lotteryPrizeList);
+            }
         }
 
         private string _lotterySummaryText = string.Empty;
@@ -293,7 +321,7 @@ namespace IslandCaller.ViewModels
 
         public ICommand RefreshUsbAuthCommand => new RelayCommand(() =>
         {
-            RefreshUsbAuthStatus(IAppHost.GetService<HistoryService>());
+            RefreshUsbAuthStatus(_historyService);
         });
 
         public ICommand AddLotteryPrizeCommand => new RelayCommand(() =>
@@ -454,13 +482,31 @@ namespace IslandCaller.ViewModels
                 set => this.RaiseAndSetIfChanged(ref _isFeatured, value);
             }
         }
-        private readonly Dictionary<StudentModel, PropertyChangedEventHandler> _handlers = new();
         private ObservableCollection<StudentModel> _profileList = new();
         public ObservableCollection<StudentModel> ProfileList
         {
             get => _profileList;
-            set => this.RaiseAndSetIfChanged(ref _profileList, value);
+            set
+            {
+                if (ReferenceEquals(_profileList, value))
+                {
+                    return;
+                }
+
+                DetachProfileCollection(_profileList);
+                this.RaiseAndSetIfChanged(ref _profileList, value);
+                AttachProfileCollection(_profileList);
+                UpdateProfileSummary();
+            }
         }
+
+        private string _profileSummaryText = string.Empty;
+        public string ProfileSummaryText
+        {
+            get => _profileSummaryText;
+            set => this.RaiseAndSetIfChanged(ref _profileSummaryText, value);
+        }
+
         public IReadOnlyList<int> RarityOptions { get; } = [3, 5];
         public ICommand RowCommand => new RelayCommand<StudentModel>(row =>
         {
@@ -477,12 +523,12 @@ namespace IslandCaller.ViewModels
         // 构造函数
         public SettingPageViewModel()
         {
-            ProfileService profileService = IAppHost.GetService<ProfileService>();
-            HistoryService historyService = IAppHost.GetService<HistoryService>();
-            CoreService coreService = IAppHost.GetService<CoreService>();
-            LotteryService lotteryService = IAppHost.GetService<LotteryService>();
-            UsbAuthService usbAuthService = IAppHost.GetService<UsbAuthService>();
-            Plugin plugin = IAppHost.GetService<Plugin>();
+            _profileService = IAppHost.GetService<ProfileService>();
+            _historyService = IAppHost.GetService<HistoryService>();
+            _coreService = IAppHost.GetService<CoreService>();
+            _lotteryService = IAppHost.GetService<LotteryService>();
+            _usbAuthService = IAppHost.GetService<UsbAuthService>();
+            _plugin = IAppHost.GetService<Plugin>();
 
             // 初始化默认值
             IsBreakDisable = Settings.Instance.General.BreakDisable;
@@ -507,13 +553,13 @@ namespace IslandCaller.ViewModels
             FiveStarFeaturedRate = Settings.Instance.Gacha.FiveStarFeaturedRate;
             FourStarFeaturedRate = Settings.Instance.Gacha.FourStarFeaturedRate;
             GuaranteeListText = Settings.Instance.General.GuaranteeListText;
-            GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
-            LotteryPrizeList = BuildLotteryPrizeList(lotteryService);
-            UpdateGuaranteeMemberOptions(profileService);
-            RefreshPacerList(profileService);
+            GuaranteeWeightList = BuildGuaranteeWeightList(_profileService);
+            LotteryPrizeList = BuildLotteryPrizeList(_lotteryService);
+            UpdateGuaranteeMemberOptions(_profileService);
+            RefreshPacerList(_profileService);
             IsHoverEnable = Settings.Instance.Hover.IsEnable;
             HoverScalingFactor = Settings.Instance.Hover.ScalingFactor;
-            var profile = profileService.GetMembers(CurrentProfile)
+            var profile = _profileService.GetMembers(CurrentProfile)
             .OrderBy(m => m.Id)
             .Select(m => new StudentModel
             {
@@ -525,8 +571,9 @@ namespace IslandCaller.ViewModels
                 IsFeatured = m.IsFeatured
             });
             ProfileList = new ObservableCollection<StudentModel>(profile);
-            ApplyUsbAuthSnapshot(usbAuthService.RefreshStatus(forceRefresh: true));
+            ApplyUsbAuthSnapshot(_usbAuthService.RefreshStatus(forceRefresh: true));
             UpdateLotterySummary();
+            UpdateProfileSummary();
 
             this.PropertyChanged += (sender, args) =>
             {
@@ -549,8 +596,8 @@ namespace IslandCaller.ViewModels
                 else if (args.PropertyName == nameof(IsGuaranteeEnabled))
                 {
                     Settings.Instance.General.EnableGuarantee = IsGuaranteeEnabled;
-                    UpdateGuaranteeSummary(profileService);
-                    RefreshHistoryAndStatistics(historyService);
+                    UpdateGuaranteeSummary(_profileService);
+                    RefreshHistoryAndStatistics(_historyService);
                 }
                 else if (args.PropertyName == nameof(GuaranteeThreshold))
                 {
@@ -559,8 +606,8 @@ namespace IslandCaller.ViewModels
                     {
                         GuaranteeThreshold = 1;
                     }
-                    UpdateGuaranteeSummary(profileService);
-                    RefreshHistoryAndStatistics(historyService);
+                    UpdateGuaranteeSummary(_profileService);
+                    RefreshHistoryAndStatistics(_historyService);
                 }
                 else if (args.PropertyName == nameof(PacerThreshold))
                 {
@@ -570,14 +617,14 @@ namespace IslandCaller.ViewModels
                         PacerThreshold = 1;
                     }
 
-                    RefreshPacerList(profileService);
-                    RefreshHistoryAndStatistics(historyService);
+                    RefreshPacerList(_profileService);
+                    RefreshHistoryAndStatistics(_historyService);
                 }
                 else if (args.PropertyName == nameof(IsGachaEnabled))
                 {
                     if (IsGachaEnabled)
                     {
-                        var authSnapshot = RefreshUsbAuthStatus(historyService);
+                        var authSnapshot = RefreshUsbAuthStatus(_historyService);
                         if (authSnapshot.IsRequired && !authSnapshot.IsVerified)
                         {
                             IsGachaEnabled = false;
@@ -586,13 +633,13 @@ namespace IslandCaller.ViewModels
                     }
 
                     Settings.Instance.Gacha.Enabled = IsGachaEnabled;
-                    RefreshHistoryAndStatistics(historyService);
-                    UpdateGachaSummary(historyService);
+                    RefreshHistoryAndStatistics(_historyService);
+                    UpdateGachaSummary(_historyService);
                 }
                 else if (args.PropertyName == nameof(IsUsbAuthRequired))
                 {
                     Settings.Instance.Gacha.RequireUsbAuth = IsUsbAuthRequired;
-                    HandleUsbAuthConfigurationChanged(historyService);
+                    HandleUsbAuthConfigurationChanged(_historyService);
                 }
                 else if (args.PropertyName == nameof(UsbAuthFileName))
                 {
@@ -604,12 +651,12 @@ namespace IslandCaller.ViewModels
                         return;
                     }
 
-                    HandleUsbAuthConfigurationChanged(historyService);
+                    HandleUsbAuthConfigurationChanged(_historyService);
                 }
                 else if (args.PropertyName == nameof(UsbAuthToken))
                 {
                     Settings.Instance.Gacha.UsbAuthToken = UsbAuthToken ?? string.Empty;
-                    HandleUsbAuthConfigurationChanged(historyService);
+                    HandleUsbAuthConfigurationChanged(_historyService);
                 }
                 else if (args.PropertyName == nameof(FiveStarBaseRate))
                 {
@@ -654,15 +701,16 @@ namespace IslandCaller.ViewModels
                 else if (args.PropertyName == nameof(GuaranteeListText))
                 {
                     Settings.Instance.General.GuaranteeListText = GuaranteeListText;
-                    UpdateGuaranteeSummary(profileService);
-                    RefreshPacerList(profileService);
+                    UpdateGuaranteeSummary(_profileService);
+                    RefreshPacerList(_profileService);
                 }
                 else if (args.PropertyName == nameof(GuaranteeWeightList))
                 {
                     SaveGuaranteeWeights();
-                    UpdateGuaranteeSummary(profileService);
-                    UpdateGuaranteeMemberOptions(profileService);
-                    RefreshPacerList(profileService);
+                    UpdateGuaranteeListTextFromRows();
+                    UpdateGuaranteeSummary(_profileService);
+                    UpdateGuaranteeMemberOptions(_profileService);
+                    RefreshPacerList(_profileService);
                 }
                 else if (args.PropertyName == nameof(LotteryPrizeList))
                 {
@@ -674,11 +722,11 @@ namespace IslandCaller.ViewModels
                     Settings.Instance.Hover.IsEnable = IsHoverEnable;
                     if (IsHoverEnable)
                     {
-                        plugin.HoverWindow = new HoverFluent();
-                        plugin.HoverWindow.DataContext = IAppHost.GetService<HoverFluentViewModel>();
-                        plugin.HoverWindow.Show();
+                        _plugin.HoverWindow = new HoverFluent();
+                        _plugin.HoverWindow.DataContext = IAppHost.GetService<HoverFluentViewModel>();
+                        _plugin.HoverWindow.Show();
                     }
-                    else plugin.HoverWindow?.Close();
+                    else _plugin.HoverWindow?.Close();
                 }
                 else if (args.PropertyName == nameof(HoverScalingFactor))
                 {
@@ -686,122 +734,247 @@ namespace IslandCaller.ViewModels
                 }
                 else if (args.PropertyName == nameof(ProfileList))
                 {
-                    List<Person> list = BuildProfilePersons();
-                    profileService.Members = list;
-                    profileService.SaveProfile(CurrentProfile, list);
-                    historyService.Load(CurrentProfile);
-                    coreService.InitializeCore();
-                    GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
-                    UpdateGuaranteeSummary(profileService);
-                    UpdateGuaranteeMemberOptions(profileService);
-                    RefreshPacerList(profileService);
-                    UpdateGachaSummary(historyService);
-                    RefreshHistoryAndStatistics(historyService);
+                    ApplyProfileChanges();
                 }
             };
-
-            GuaranteeWeightList.CollectionChanged += (_, __) =>
-            {
-                SaveGuaranteeWeights();
-                UpdateGuaranteeListTextFromRows();
-                UpdateGuaranteeSummary(profileService);
-                UpdateGuaranteeMemberOptions(profileService);
-                RefreshPacerList(profileService);
-                UpdateGachaSummary(historyService);
-            };
-
-            LotteryPrizeList.CollectionChanged += (s, e) =>
-            {
-                if (e.NewItems != null)
-                {
-                    foreach (LotteryPrizeModel prize in e.NewItems)
-                    {
-                        prize.PropertyChanged += LotteryPrize_PropertyChanged;
-                    }
-                }
-
-                if (e.OldItems != null)
-                {
-                    foreach (LotteryPrizeModel prize in e.OldItems)
-                    {
-                        prize.PropertyChanged -= LotteryPrize_PropertyChanged;
-                    }
-                }
-
-                SaveLotteryPrizes();
-                UpdateLotterySummary();
-            };
-
-            foreach (var prize in LotteryPrizeList)
-            {
-                prize.PropertyChanged += LotteryPrize_PropertyChanged;
-            }
-
-            ProfileList.CollectionChanged += (s, e) =>
-            {
-                if (e.NewItems != null)
-                {
-                    foreach (StudentModel student in e.NewItems)
-                    {
-                        PropertyChangedEventHandler handler = (_, _) =>
-                        {
-                            List<Person> list = BuildProfilePersons();
-
-                            profileService.Members = list;
-                            profileService.SaveProfile(CurrentProfile, list);
-                            historyService.Load(CurrentProfile);
-                            coreService.InitializeCore();
-                            GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
-                            UpdateGuaranteeSummary(profileService);
-                            UpdateGuaranteeMemberOptions(profileService);
-                            RefreshPacerList(profileService);
-                            UpdateGachaSummary(historyService);
-                            RefreshHistoryAndStatistics(historyService);
-                        };
-
-                        _handlers[student] = handler;
-                        student.PropertyChanged += handler;
-                    }
-                }
-                if (e.OldItems != null)
-                {
-                    foreach (StudentModel student in e.OldItems)
-                    {
-                        if (_handlers.TryGetValue(student, out var handler))
-                        {
-                            student.PropertyChanged -= handler;
-                            _handlers.Remove(student);
-                        }
-                    }
-                }
-
-            };
-            foreach (var student in ProfileList)
-            {
-                PropertyChangedEventHandler handler = (_, _) =>
-                {
-                    List<Person> list = BuildProfilePersons();
-
-                    profileService.Members = list;
-                    profileService.SaveProfile(CurrentProfile, list);
-                    historyService.Load(CurrentProfile);
-                    coreService.InitializeCore();
-                    GuaranteeWeightList = BuildGuaranteeWeightList(profileService);
-                    UpdateGuaranteeSummary(profileService);
-                    UpdateGuaranteeMemberOptions(profileService);
-                    RefreshPacerList(profileService);
-                    UpdateGachaSummary(historyService);
-                    RefreshHistoryAndStatistics(historyService);
-                };
-
-                _handlers[student] = handler;
-                student.PropertyChanged += handler;
-            }
-
-            UpdateGuaranteeSummary(profileService);
+            UpdateGuaranteeSummary(_profileService);
             UpdateLotterySummary();
-            UpdateGachaSummary(historyService);
-            RefreshHistoryAndStatistics(historyService);
+            UpdateGachaSummary(_historyService);
+            RefreshHistoryAndStatistics(_historyService);
+        }
+
+        private void AttachGuaranteeWeightCollection(ObservableCollection<GuaranteeWeightModel>? collection)
+        {
+            if (collection == null)
+            {
+                return;
+            }
+
+            collection.CollectionChanged += OnGuaranteeWeightCollectionChanged;
+            foreach (var item in collection)
+            {
+                item.PropertyChanged += OnGuaranteeWeightPropertyChanged;
+            }
+        }
+
+        private void DetachGuaranteeWeightCollection(ObservableCollection<GuaranteeWeightModel>? collection)
+        {
+            if (collection == null)
+            {
+                return;
+            }
+
+            collection.CollectionChanged -= OnGuaranteeWeightCollectionChanged;
+            foreach (var item in collection)
+            {
+                item.PropertyChanged -= OnGuaranteeWeightPropertyChanged;
+            }
+        }
+
+        private void OnGuaranteeWeightCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (GuaranteeWeightModel item in e.NewItems)
+                {
+                    item.PropertyChanged += OnGuaranteeWeightPropertyChanged;
+                }
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (GuaranteeWeightModel item in e.OldItems)
+                {
+                    item.PropertyChanged -= OnGuaranteeWeightPropertyChanged;
+                }
+            }
+
+            SaveGuaranteeWeights();
+            UpdateGuaranteeListTextFromRows();
+            UpdateGuaranteeSummary(_profileService);
+            UpdateGuaranteeMemberOptions(_profileService);
+            RefreshPacerList(_profileService);
+            UpdateGachaSummary(_historyService);
+        }
+
+        private void OnGuaranteeWeightPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (sender is not GuaranteeWeightModel item)
+            {
+                return;
+            }
+
+            if (item.Weight < 0.01)
+            {
+                item.Weight = 0.01;
+                return;
+            }
+
+            SaveGuaranteeWeights();
+            UpdateGuaranteeListTextFromRows();
+            UpdateGuaranteeSummary(_profileService);
+            UpdateGuaranteeMemberOptions(_profileService);
+            RefreshPacerList(_profileService);
+            UpdateGachaSummary(_historyService);
+        }
+
+        private void AttachLotteryPrizeCollection(ObservableCollection<LotteryPrizeModel>? collection)
+        {
+            if (collection == null)
+            {
+                return;
+            }
+
+            collection.CollectionChanged += OnLotteryPrizeCollectionChanged;
+            foreach (var item in collection)
+            {
+                item.PropertyChanged += LotteryPrize_PropertyChanged;
+            }
+        }
+
+        private void DetachLotteryPrizeCollection(ObservableCollection<LotteryPrizeModel>? collection)
+        {
+            if (collection == null)
+            {
+                return;
+            }
+
+            collection.CollectionChanged -= OnLotteryPrizeCollectionChanged;
+            foreach (var item in collection)
+            {
+                item.PropertyChanged -= LotteryPrize_PropertyChanged;
+            }
+        }
+
+        private void OnLotteryPrizeCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (LotteryPrizeModel item in e.NewItems)
+                {
+                    item.PropertyChanged += LotteryPrize_PropertyChanged;
+                }
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (LotteryPrizeModel item in e.OldItems)
+                {
+                    item.PropertyChanged -= LotteryPrize_PropertyChanged;
+                }
+            }
+
+            SaveLotteryPrizes();
+            UpdateLotterySummary();
+        }
+
+        private void AttachProfileCollection(ObservableCollection<StudentModel>? collection)
+        {
+            if (collection == null)
+            {
+                return;
+            }
+
+            collection.CollectionChanged += OnProfileCollectionChanged;
+            foreach (var student in collection)
+            {
+                student.PropertyChanged += OnProfileStudentChanged;
+            }
+        }
+
+        private void DetachProfileCollection(ObservableCollection<StudentModel>? collection)
+        {
+            if (collection == null)
+            {
+                return;
+            }
+
+            collection.CollectionChanged -= OnProfileCollectionChanged;
+            foreach (var student in collection)
+            {
+                student.PropertyChanged -= OnProfileStudentChanged;
+            }
+        }
+
+        private void OnProfileCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (StudentModel student in e.NewItems)
+                {
+                    student.PropertyChanged += OnProfileStudentChanged;
+                }
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (StudentModel student in e.OldItems)
+                {
+                    student.PropertyChanged -= OnProfileStudentChanged;
+                }
+            }
+
+            ApplyProfileChanges();
+        }
+
+        private void OnProfileStudentChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            ApplyProfileChanges();
+        }
+
+        private void ApplyProfileChanges()
+        {
+            List<Person> list = BuildProfilePersons();
+
+            _profileService.Members = list;
+            _profileService.SaveProfile(CurrentProfile, list);
+            _historyService.Load(CurrentProfile);
+            _coreService.InitializeCore();
+            GuaranteeWeightList = BuildGuaranteeWeightList(_profileService);
+            UpdateGuaranteeSummary(_profileService);
+            UpdateGuaranteeMemberOptions(_profileService);
+            RefreshPacerList(_profileService);
+            UpdateGachaSummary(_historyService);
+            RefreshHistoryAndStatistics(_historyService);
+            UpdateProfileSummary();
+        }
+
+        private void UpdateProfileSummary()
+        {
+            if (ProfileList.Count == 0)
+            {
+                ProfileSummaryText = "当前名单为空。可以手动添加成员，或通过导入快速开始。";
+                return;
+            }
+
+            int blankCount = ProfileList.Count(x => string.IsNullOrWhiteSpace(x.Name));
+            int duplicateCount = ProfileList
+                .Select(x => x.Name?.Trim() ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .GroupBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .Sum(g => Math.Max(0, g.Count() - 1));
+            int validCount = ProfileList.Count - blankCount;
+            int weightedCount = ProfileList.Count(x => x.ManualWeight > 1.0);
+            int fiveStarCount = ProfileList.Count(x => x.Rarity == 5);
+
+            List<string> parts =
+            [
+                $"当前名单共 {ProfileList.Count} 人，可正常参与 {Math.Max(0, validCount)} 人",
+                $"五星候选 {fiveStarCount} 人",
+                $"手动加权 {weightedCount} 人"
+            ];
+
+            if (blankCount > 0)
+            {
+                parts.Add($"有 {blankCount} 个空白姓名待补全");
+            }
+
+            if (duplicateCount > 0)
+            {
+                parts.Add($"有 {duplicateCount} 条重复姓名，建议合并或改名");
+            }
+
+            ProfileSummaryText = string.Join("；", parts) + "。";
         }
 
         public void AddGuaranteeMember(ProfileService profileService)
@@ -832,7 +1005,7 @@ namespace IslandCaller.ViewModels
 
         public void RefreshHistoryAndStatistics(HistoryService historyService)
         {
-            ApplyUsbAuthSnapshot(IAppHost.GetService<UsbAuthService>().RefreshStatus());
+            ApplyUsbAuthSnapshot(_usbAuthService.RefreshStatus());
             var snapshot = historyService.GetHistorySnapshot().OrderByDescending(x => x.LongTermCount).ThenBy(x => x.Name).ToList();
             var totalLongTerm = historyService.GetTotalLongTermCallCount();
             var average = historyService.GetAverageLongTermCount();
@@ -905,7 +1078,7 @@ namespace IslandCaller.ViewModels
 
         private UsbAuthSnapshot RefreshUsbAuthStatus(HistoryService historyService)
         {
-            var snapshot = IAppHost.GetService<UsbAuthService>().RefreshStatus(forceRefresh: true);
+            var snapshot = _usbAuthService.RefreshStatus(forceRefresh: true);
             ApplyUsbAuthSnapshot(snapshot);
             UpdateGachaSummary(historyService);
             RefreshHistoryAndStatistics(historyService);
@@ -988,20 +1161,6 @@ namespace IslandCaller.ViewModels
                 .OrderByDescending(x => currentMembers.Contains(x.Name))
                 .ThenBy(x => x.Name)
                 .ToList();
-
-            foreach (var item in cleaned)
-            {
-                item.PropertyChanged += (_, __) =>
-                {
-                    if (item.Weight < 0.01)
-                    {
-                        item.Weight = 0.01;
-                    }
-
-                    SaveGuaranteeWeights();
-                    UpdateGuaranteeListTextFromRows();
-                };
-            }
 
             SaveGuaranteeWeights(cleaned);
             return new ObservableCollection<GuaranteeWeightModel>(cleaned);
@@ -1204,9 +1363,9 @@ namespace IslandCaller.ViewModels
                 .Select(s => new Person
                 {
                     Id = s.ID,
-                    Name = s.Name,
+                    Name = s.Name?.Trim() ?? string.Empty,
                     Gender = s.Gender,
-                    ManualWeight = s.ManualWeight,
+                    ManualWeight = Math.Max(0.01, s.ManualWeight),
                     Rarity = Enum.IsDefined(typeof(GachaRarity), s.Rarity) ? (GachaRarity)s.Rarity : GachaRarity.ThreeStar,
                     IsFeatured = s.IsFeatured
                 })

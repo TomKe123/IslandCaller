@@ -1,18 +1,28 @@
-<Project DefaultTargets="Publish" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
   <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <CreateCipx Condition="'$(CreateCipx)' == ''">false</CreateCipx>
+    <InnerProject>IslandCaller.Plugin2\IslandCaller.Plugin2.csproj</InnerProject>
   </PropertyGroup>
 
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
   <Target Name="Restore">
-    <Exec Command="dotnet restore &quot;IslandCaller.Plugin2\IslandCaller.Plugin2.csproj&quot;" />
+    <Exec Command="dotnet restore &quot;$(InnerProject)&quot;" />
   </Target>
 
   <Target Name="Build" DependsOnTargets="Restore">
-    <Exec Command="dotnet build &quot;IslandCaller.Plugin2\IslandCaller.Plugin2.csproj&quot; -c $(Configuration) --no-restore" />
+    <Exec Command="dotnet build &quot;$(InnerProject)&quot; -c $(Configuration) --no-restore" />
   </Target>
 
   <Target Name="Publish" DependsOnTargets="Restore">
-    <Exec Command="dotnet publish &quot;IslandCaller.Plugin2\IslandCaller.Plugin2.csproj&quot; -c $(Configuration) --no-restore -p:CreateCipx=$(CreateCipx)" />
+    <Exec Command="dotnet publish &quot;$(InnerProject)&quot; -c $(Configuration) --no-restore -p:CreateCipx=$(CreateCipx)" />
   </Target>
 </Project>

@@ -184,7 +184,8 @@
                     <StackPanel Spacing="8">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Click="RefreshHistoryStatsButton_OnClick">刷新历史和统计</Button>
-                            <Button Click="ClearButton_OnClick">清空全部历史</Button>
+                            <Button Click="ClearButton_OnClick"
+                                    ToolTip.Tip="会同时清空本节历史、长期统计和保底水位。">清空点名历史</Button>
                         </StackPanel>
                         <TextBlock Text="统计概览" FontWeight="SemiBold"/>
                         <DataGrid ItemsSource="{Binding StatisticsList}" RowHeight="36" MaxHeight="260" IsReadOnly="True">
@@ -242,6 +243,13 @@
             <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xF20C;}" Header="档案编辑" Description="编辑点名成员、星级与 UP 状态">
                 <fa:SettingsExpanderItem>
                     <StackPanel Spacing="8">
+                        <Border Padding="12"
+                                CornerRadius="8"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                            <TextBlock Opacity="0.78"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding ProfileSummaryText}"/>
+                        </Border>
                         <DataGrid ItemsSource="{Binding ProfileList}" RowHeight="45">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="序号" Binding="{Binding ID}" Width="80"/>
@@ -286,8 +294,9 @@
                             <Button Click="ImportButton_OnClick">
                                 <ci:IconText Glyph="&#xE58F;" Text="导入名单"/>
                             </Button>
-                            <Button Click="ClearButton_OnClick">
-                                <ci:IconText Glyph="&#xE2C2;" Text="清除历史记录"/>
+                            <Button Click="ClearButton_OnClick"
+                                    ToolTip.Tip="会同时清空本节历史、长期统计和保底水位。">
+                                <ci:IconText Glyph="&#xE2C2;" Text="清空点名历史"/>
                             </Button>
                             <Button Click="RefreshHistoryStatsButton_OnClick">
                                 <ci:IconText Glyph="&#xE81C;" Text="刷新统计"/>

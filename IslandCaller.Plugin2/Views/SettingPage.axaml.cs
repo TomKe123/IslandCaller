@@ -25,6 +25,8 @@ namespace IslandCaller.Views;
 [SettingsPageInfo("plugins.IslandCaller", "IslandCaller 设置", "\uED39", "\uECF8", SettingsPageCategory.External)]
 public partial class SettingPage : SettingsPageBase
 {
+    private sealed record ImportNormalizationResult(ObservableCollection<StudentModel> Profiles, int BlankCount, int DuplicateCount);
+
     private enum HotkeyBindingTarget
     {
         None,
@@ -84,13 +86,8 @@ public partial class SettingPage : SettingsPageBase
 
     private async void ImportButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        List<Person> newlist = new List<Person>();
+        List<Person> newlist = [];
         logger.LogInformation("开始导入名单流程");
-
-        await CommonTaskDialogs.ShowDialog("导入提示", "导入的名单仅支持下列格式: \n\n" +
-            "文本名单 (*.txt): 名单仅包含姓名，使用空格，逗号，或换行分隔\n\n" +
-            "SecRandom 名单 (\\list\\rool_call_list\\*.json)\n\n" +
-            "CSV 名单 (*.csv): 名单包含姓名,性别可选，不能含有标题");
 
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel is null)
@@ -102,7 +99,7 @@ public partial class SettingPage : SettingsPageBase
 
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "选择要导入的名单",
+            Title = "选择要导入的名单（TXT / JSON / CSV）",
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
@@ -157,24 +154,20 @@ public partial class SettingPage : SettingsPageBase
                     return;
             }
 
-            var orderedProfile = newlist
-                .OrderBy(m => m.Id)
-                .Select(m => new StudentModel
-                {
-                    ID = m.Id,
-                    Name = m.Name,
-                    Gender = m.Gender,
-                    ManualWeight = m.ManualWeight,
-                    Rarity = (int)m.Rarity,
-                    IsFeatured = m.IsFeatured
-                });
+            var normalized = NormalizeImportedProfiles(newlist);
+            if (normalized.Profiles.Count == 0)
+            {
+                logger?.LogWarning("导入名单后无可用成员，FileName={FileName}", file.Name);
+                await CommonTaskDialogs.ShowDialog("导入结果为空", "未导入到可用成员，请检查文件内容是否包含有效姓名。");
+                return;
+            }
 
             if (vm != null)
             {
-                vm.ProfileList = new ObservableCollection<StudentModel>(orderedProfile);
+                vm.ProfileList = normalized.Profiles;
                 vm.RefreshHistoryAndStatistics(HistoryService);
                 logger?.LogInformation("名单导入成功，共导入 {Count} 人", vm.ProfileList.Count);
-                await CommonTaskDialogs.ShowDialog("导入完成", $"成功导入 {vm.ProfileList.Count} 条名单。");
+                await CommonTaskDialogs.ShowDialog("导入完成", BuildImportSummaryText(normalized));
             }
         }
         catch (Exception ex)
@@ -182,6 +175,67 @@ public partial class SettingPage : SettingsPageBase
             logger?.LogError(ex, "导入名单过程中发生异常，文件：{FileName}", file.Name);
             await CommonTaskDialogs.ShowDialog("导入失败", "导入名单时发生错误，请检查文件格式后重试。");
         }
+    }
+
+    private static ImportNormalizationResult NormalizeImportedProfiles(IEnumerable<Person> source)
+    {
+        HashSet<string> seenNames = new(StringComparer.OrdinalIgnoreCase);
+        List<StudentModel> profiles = [];
+        int blankCount = 0;
+        int duplicateCount = 0;
+
+        foreach (var person in source.OrderBy(m => m.Id))
+        {
+            string normalizedName = person.Name?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(normalizedName))
+            {
+                blankCount++;
+                continue;
+            }
+
+            if (!seenNames.Add(normalizedName))
+            {
+                duplicateCount++;
+                continue;
+            }
+
+            profiles.Add(new StudentModel
+            {
+                ID = profiles.Count + 1,
+                Name = normalizedName,
+                Gender = person.Gender,
+                ManualWeight = Math.Max(0.01, person.ManualWeight),
+                Rarity = (int)person.Rarity,
+                IsFeatured = person.IsFeatured
+            });
+        }
+
+        return new ImportNormalizationResult(new ObservableCollection<StudentModel>(profiles), blankCount, duplicateCount);
+    }
+
+    private static string BuildImportSummaryText(ImportNormalizationResult result)
+    {
+        List<string> lines =
+        [
+            $"已用导入结果替换当前名单，共保留 {result.Profiles.Count} 人。"
+        ];
+
+        if (result.BlankCount > 0)
+        {
+            lines.Add($"已自动跳过 {result.BlankCount} 个空白姓名。");
+        }
+
+        if (result.DuplicateCount > 0)
+        {
+            lines.Add($"已自动去重 {result.DuplicateCount} 条重复姓名。");
+        }
+
+        if (result.BlankCount == 0 && result.DuplicateCount == 0)
+        {
+            lines.Add("名单已按顺序整理并可直接使用。");
+        }
+
+        return string.Join("\n", lines);
     }
 
     private void ClearButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

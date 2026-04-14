@@ -1,42 +1,171 @@
-using Avalonia.Controls;
 using Avalonia;
+using Avalonia.Controls;
 using ClassIsland.Shared;
+using IslandCaller.Services;
 using IslandCaller.Services.IslandCallerService;
 using System.ComponentModel;
+using System.Linq;
 
 namespace IslandCaller.Views;
 
-public partial class PersonalCall : Window,INotifyPropertyChanged
+public partial class PersonalCall : Window, INotifyPropertyChanged
 {
-    public double Num { get; set; }
-    private IslandCallerService IslandCallerService { get; }
+    private readonly IslandCallerService _islandCallerService;
+    private readonly Status _status;
+    private readonly CoreService _coreService;
     private const int OwnerGapPx = 12;
+
+    private double _num = 1;
+    public double Num
+    {
+        get => _num;
+        set
+        {
+            double normalized = Math.Clamp(Math.Round(value), 1, 10);
+            if (Math.Abs(_num - normalized) < double.Epsilon)
+            {
+                return;
+            }
+
+            _num = normalized;
+            RaisePropertyChanged(nameof(Num));
+            RaisePropertyChanged(nameof(SelectionSummaryText));
+        }
+    }
+
+    private bool _canStartCall;
+    public bool CanStartCall
+    {
+        get => _canStartCall;
+        private set
+        {
+            if (_canStartCall == value)
+            {
+                return;
+            }
+
+            _canStartCall = value;
+            RaisePropertyChanged(nameof(CanStartCall));
+        }
+    }
+
+    private string _availabilityText = string.Empty;
+    public string AvailabilityText
+    {
+        get => _availabilityText;
+        private set
+        {
+            if (_availabilityText == value)
+            {
+                return;
+            }
+
+            _availabilityText = value;
+            RaisePropertyChanged(nameof(AvailabilityText));
+            RaisePropertyChanged(nameof(SelectionSummaryText));
+        }
+    }
+
+    public string SelectionSummaryText => CanStartCall
+        ? $"将按顺序点名 {(int)Num} 人；连续抽取时可能出现重复。"
+        : AvailabilityText;
+
     public PersonalCall()
     {
-        IslandCallerService = IAppHost.GetService<IslandCallerService>();   
+        _islandCallerService = IAppHost.GetService<IslandCallerService>();
+        _status = IAppHost.GetService<Status>();
+        _coreService = IAppHost.GetService<CoreService>();
+
         InitializeComponent();
         DataContext = this;
+
+        RefreshAvailability();
+        _status.PropertyChanged += StatusOnPropertyChanged;
     }
 
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
 
-        if (Owner == null)
+        if (Owner != null)
         {
+            PositionNearOwner(Owner);
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _status.PropertyChanged -= StatusOnPropertyChanged;
+        base.OnClosed(e);
+    }
+
+    private void StatusOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Status.ProfileServiceInitialized)
+            or nameof(Status.HistoryServiceInitialized)
+            or nameof(Status.CoreServiceInitialized)
+            or nameof(Status.IslandCallerServiceInitialized)
+            or nameof(Status.IsTimeStatusAvailable)
+            or nameof(Status.OccupationDisable)
+            or nameof(Status.IsPluginReady))
+        {
+            RefreshAvailability();
+        }
+    }
+
+    private void RefreshAvailability()
+    {
+        string? blockedReason = GetBlockedReason();
+        CanStartCall = string.IsNullOrWhiteSpace(blockedReason);
+        AvailabilityText = blockedReason ?? $"当前可用成员 {GetAvailableMemberCount()} 人。";
+    }
+
+    private string? GetBlockedReason()
+    {
+        int memberCount = GetAvailableMemberCount();
+        if (memberCount <= 0)
+        {
+            return "当前名单为空，请先添加成员或导入名单。";
+        }
+
+        if (!_status.ProfileServiceInitialized || !_status.HistoryServiceInitialized || !_status.CoreServiceInitialized || !_status.IslandCallerServiceInitialized)
+        {
+            return "插件仍在初始化，请稍后再试。";
+        }
+
+        if (!_status.IsTimeStatusAvailable)
+        {
+            return "当前为非上课时段，点名已按设置暂停。";
+        }
+
+        if (!_status.OccupationDisable)
+        {
+            return "当前已有点名流程正在进行，请稍后再试。";
+        }
+
+        return null;
+    }
+
+    private int GetAvailableMemberCount()
+    {
+        return _coreService.StudentNames.Count(name => !string.IsNullOrWhiteSpace(name));
+    }
+
+    private void CancelButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void SureButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!CanStartCall)
+        {
+            RefreshAvailability();
             return;
         }
 
-        PositionNearOwner(Owner);
-    }
-    private void CancelButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        this.Close();
-    }
-    private void SureButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        IslandCallerService.ShowRandomStudent((int)Num);
-        this.Close();
+        _islandCallerService.ShowRandomStudent((int)Num);
+        Close();
     }
 
     private void PositionNearOwner(WindowBase owner)
@@ -98,4 +227,11 @@ public partial class PersonalCall : Window,INotifyPropertyChanged
         if (value > max) return max;
         return value;
     }
+
+    private void RaisePropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public new event PropertyChangedEventHandler? PropertyChanged;
 }

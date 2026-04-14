@@ -24,6 +24,7 @@
         Width="88"
         Classes="accent"
         Focusable="False"
+        ToolTip.Tip="点击快速点名 1 人，拖动可移动悬浮窗"
         IsEnabled="{Binding IsEnabled}">
           <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Focusable="False">
               <Grid.ColumnDefinitions>
@@ -32,7 +33,7 @@
                   <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
               <ci:FluentIcon Glyph="{Binding Glyph1}" FontSize="28" Focusable="False" Grid.Column="0"/>
-              <TextBlock Text="Call" FontFamily="HarmonyOS Sans SC" FontWeight="Medium" FontSize="21" Grid.Column="2" VerticalAlignment="Center" Focusable="False"/>
+              <TextBlock Text="点名" FontFamily="HarmonyOS Sans SC" FontWeight="Medium" FontSize="21" Grid.Column="2" VerticalAlignment="Center" Focusable="False"/>
           </Grid>
       </Button>
       <Button
@@ -43,7 +44,8 @@
         IsEnabled="{Binding IsEnabled}"
         HorizontalAlignment="Center"
         VerticalAlignment="Center"
-        Focusable="False">
+        Focusable="False"
+        ToolTip.Tip="点击打开自定义点名，拖动可移动悬浮窗">
           <ci:FluentIcon Glyph="{Binding Glyph2}" FontSize="28" Focusable="False"/>
       </Button>
   </Grid>

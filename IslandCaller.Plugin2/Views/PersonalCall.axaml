@@ -15,101 +15,61 @@
         ShowInTaskbar="False"
         Topmost="True"
         CanResize="False"
-        Height="200"
-        Width="500"
+        Height="300"
+        Width="520"
         WindowStartupLocation="CenterScreen">
   <Panel Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
-      <Grid
-        HorizontalAlignment="Center"
-        VerticalAlignment="Stretch">
-		<Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="10"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        <Grid
-        Margin="0,20,0,0"
-        Grid.Row="0"
-        Grid.Column="0">
-            <Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <ci:FluentIcon Glyph="&#xED38;"
-                       FontSize="22"
-                       Grid.Column="0"/>
-        <TextBlock
-            Text="IslandCaller 自定义抽取"
-            FontFamily="HarmonyOS Sans SC"
-            FontSize="18"
-            Margin="5,0,0,0"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Grid.Column="1"/>
-        </Grid>
-        <fa:SettingsExpander 
-        Grid.Row="2" 
-        Grid.Column="0" Grid.ColumnSpan="3"
-        IconSource="{ci:FluentIconSource &#xECB8;}"
-        Header="抽取人数"
-        Description="指定本次抽取的总人数">
-            <fa:SettingsExpander.Footer>
-                <Slider
-                Minimum="1"
-                Maximum="10"
-                TabIndex="1"
-                Width="250"
-                IsSnapToTickEnabled="True"
-                Classes="auto-tooltip"
-                TickFrequency="1"
-                Value="{Binding Num ,Mode=TwoWay}"
-                Ticks="1,2,3,4,5,6,7,8,9,10"
-                TickPlacement="Outside"/>
-            </fa:SettingsExpander.Footer>
-        </fa:SettingsExpander>
-      <Button
-      Margin="0,0,0,10"
-      Grid.Column="0"
-      Grid.Row="4"
-      Width="230"
-      Click="CancelButton_Click">
-          <Grid>
-			  <Grid.ColumnDefinitions>
-				  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="Auto"/>
-              </Grid.ColumnDefinitions>
-              <ci:FluentIcon Glyph="&#xE671;" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              <TextBlock Text="取消" Grid.Column="1" Margin="3,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-          </Grid>
-      </Button>
+    <StackPanel Margin="24" Spacing="12">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4">
+        <ci:FluentIcon Glyph="&#xED38;" FontSize="22" Grid.Column="0"/>
+        <TextBlock Grid.Column="1"
+                   Margin="6,0,0,0"
+                   VerticalAlignment="Center"
+                   FontFamily="HarmonyOS Sans SC"
+                   FontSize="18"
+                   Text="IslandCaller 自定义抽取"/>
+      </Grid>
 
+      <Border Padding="12" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+        <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding AvailabilityText}"/>
+      </Border>
 
-      <Button
-      VerticalAlignment="Bottom"
-      Margin="10,0,0,10"
-      Width="230"
-      Classes="accent"
-      Grid.Column="1"
-      Grid.Row="4"
-      Click="SureButton_Click">
-          <Grid
-          HorizontalAlignment="Center"
-          VerticalAlignment="Center">
-			  <Grid.ColumnDefinitions>
-				  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="Auto"/>
-              </Grid.ColumnDefinitions>
-              <ci:FluentIcon Glyph="&#xE423;" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-              <TextBlock Text="点名" Grid.Column="1" VerticalAlignment="Stretch" HorizontalAlignment="Center" Margin="3,0,0,0"/>
+      <fa:SettingsExpander Header="抽取人数" Description="指定本次按顺序弹出的姓名数量">
+        <fa:SettingsExpander.Footer>
+          <TextBlock VerticalAlignment="Center" Text="{Binding Num, StringFormat={}{0:F0}}"/>
+        </fa:SettingsExpander.Footer>
+        <fa:SettingsExpanderItem>
+          <StackPanel Spacing="8">
+            <Slider Minimum="1"
+                    Maximum="10"
+                    TabIndex="1"
+                    IsSnapToTickEnabled="True"
+                    Classes="auto-tooltip"
+                    TickFrequency="1"
+                    Value="{Binding Num, Mode=TwoWay}"/>
+            <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding SelectionSummaryText}"/>
+          </StackPanel>
+        </fa:SettingsExpanderItem>
+      </fa:SettingsExpander>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,6,0,0">
+        <Button Grid.Column="0" Click="CancelButton_Click">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <ci:FluentIcon Glyph="&#xE671;" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Center" Text="取消"/>
           </Grid>
-      </Button>
-    </Grid>
+        </Button>
+
+        <Button Grid.Column="1"
+                Classes="accent"
+                IsEnabled="{Binding CanStartCall}"
+                Click="SureButton_Click">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <ci:FluentIcon Glyph="&#xE423;" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Center" Text="开始点名"/>
+          </Grid>
+        </Button>
+      </Grid>
+    </StackPanel>
   </Panel>
 </Window>
