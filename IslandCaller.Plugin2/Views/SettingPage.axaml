@@ -23,20 +23,99 @@
 
     <ScrollViewer>
         <StackPanel Classes="settings-container animated-intro" Spacing="10">
+            <Border Padding="12"
+                    CornerRadius="8"
+                    Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+                    IsVisible="{Binding IsProtectedSettingsLocked}">
+                <TextBlock FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           Text="{Binding ProtectedSettingsLockText}"/>
+            </Border>
+
+            <ci:IconText Glyph="&#xE72E;" Text="安全设置" Margin="0,0,0,4"/>
+
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE72E;}" Header="U盘验证" Description="写入并验证授权U盘">
+                <fa:SettingsExpanderItem>
+                    <StackPanel Spacing="8">
+                        <Border Padding="14"
+                                CornerRadius="10"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                            <StackPanel Spacing="6">
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="状态总览"/>
+                                <TextBlock FontWeight="SemiBold" Text="{Binding UsbAuthStatusSummary}"/>
+                                <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding UsbAuthStatusText}"/>
+                                <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding UsbAuthActionMessage}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="14"
+                                CornerRadius="10"
+                                Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                            <StackPanel Spacing="8">
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="签发向导"/>
+                                <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding UsbAuthGuideText}"/>
+
+                                <TextBlock Text="授权文件名"/>
+                                <TextBox Width="280"
+                                         IsEnabled="{Binding CanModifyUsbAuthConfiguration}"
+                                         Text="{Binding AuthFileName, Mode=TwoWay}"
+                                         Watermark="IslandCaller.auth"/>
+
+                                <TextBlock Text="当前公钥指纹"/>
+                                <TextBox Width="240"
+                                         IsReadOnly="True"
+                                         Text="{Binding KeyFingerprint}"
+                                         Watermark="首次写入时自动生成"/>
+
+                                <TextBlock Text="已检测到的U盘"/>
+                                <ComboBox Width="360"
+                                          ItemsSource="{Binding RemovableDrives}"
+                                          SelectedItem="{Binding SelectedDrive, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding DisplayName}"/>
+                                                <TextBlock Opacity="0.65" Text="{Binding StateText}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding SelectedDriveHint}"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Command="{Binding RefreshUsbDrivesCommand}">刷新U盘列表</Button>
+                                    <Button Command="{Binding WriteAuthorizationFileCommand}"
+                                            Content="{Binding WriteButtonText}"
+                                            IsEnabled="{Binding CanWriteAuthorization}"/>
+                                    <Button Command="{Binding DisableUsbAuthCommand}"
+                                            IsEnabled="{Binding CanDisableProtection}">关闭U盘验证</Button>
+                                    <Button Command="{Binding RegenerateKeyPairCommand}"
+                                            IsEnabled="{Binding CanRegenerateKeyPair}">重置密钥对</Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </fa:SettingsExpanderItem>
+            </fa:SettingsExpander>
+
+            <StackPanel Spacing="10">
             <ci:IconText Glyph="&#xEF27;" Text="基本设置" Margin="0,0,0,4"/>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE4CE;}" Header="下课禁用" Description="在课间禁用所有点名功能">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE4CE;}" Header="下课禁用" Description="课间禁用点名">
                 <fa:SettingsExpander.Footer>
-                    <ToggleSwitch IsChecked="{Binding IsBreakDisable, Mode=TwoWay}"/>
+                    <ToggleSwitch IsChecked="{Binding IsBreakDisable, Mode=TwoWay}"
+                                  IsEnabled="{Binding CanEditProtectedSettings}"/>
                 </fa:SettingsExpander.Footer>
             </fa:SettingsExpander>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE765;}" Header="全局快捷键" Description="支持快速点名或打开高级点名窗口">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE765;}" Header="全局快捷键" Description="设置快速操作快捷键">
                 <fa:SettingsExpander.Footer>
-                    <ToggleSwitch IsChecked="{Binding IsGlobalHotkeyEnabled, Mode=TwoWay}"/>
+                    <ToggleSwitch IsChecked="{Binding IsGlobalHotkeyEnabled, Mode=TwoWay}"
+                                  IsEnabled="{Binding CanEditProtectedSettings}"/>
                 </fa:SettingsExpander.Footer>
                 <fa:SettingsExpanderItem>
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="8" IsEnabled="{Binding CanEditProtectedSettings}">
                         <TextBlock Text="快速点名快捷键"/>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock VerticalAlignment="Center" Text="{Binding QuickCallHotkey}"/>
@@ -50,14 +129,14 @@
                             <Button Click="ResetAdvancedHotkeyButton_OnClick">重置此项</Button>
                         </StackPanel>
                         <Button HorizontalAlignment="Left" Click="ResetHotkeysButton_OnClick">重置全部快捷键</Button>
-                        <TextBlock x:Name="HotkeyCaptureHint" Opacity="0.7" Text="按键绑定模式：点击开始绑定，然后按下组合键完成绑定。Esc/Backspace/Delete 可清空。"/>
+                        <TextBlock x:Name="HotkeyCaptureHint" Opacity="0.7" Text="点击“开始绑定”后按下组合键。Esc/Backspace/Delete 可清空。"/>
                     </StackPanel>
                 </fa:SettingsExpanderItem>
             </fa:SettingsExpander>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE7BF;}" Header="抽奖设置" Description="配置抽奖奖项和人数，并支持 URI 调用">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE7BF;}" Header="抽奖设置" Description="设置奖项和抽取人数">
                 <fa:SettingsExpanderItem>
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="8" IsEnabled="{Binding CanEditProtectedSettings}">
                         <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding LotterySummaryText}"/>
                         <DataGrid ItemsSource="{Binding LotteryPrizeList}" RowHeight="40" MaxHeight="240">
                             <DataGrid.Columns>
@@ -87,41 +166,24 @@
                         </StackPanel>
                         <TextBlock Opacity="0.72"
                                    TextWrapping="Wrap"
-                                   Text="URI：classisland://plugins/IslandCaller/Lottery/GUI 或 classisland://plugins/IslandCaller/Lottery/Draw?prize=一等奖&amp;count=1"/>
+                                   Text="URI：Lottery/GUI 或 Lottery/Draw?prize=一等奖&amp;count=1"/>
                     </StackPanel>
                 </fa:SettingsExpanderItem>
             </fa:SettingsExpander>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE8A5;}" Header="保底模式" Description="启用原神角色池式保底；关闭时使用默认公平抽选算法">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE8A5;}" Header="保底模式" Description="启用保底抽选">
                 <fa:SettingsExpander.Footer>
-                    <ToggleSwitch IsChecked="{Binding IsGachaEnabled, Mode=TwoWay}"/>
+                    <ToggleSwitch IsChecked="{Binding IsGachaEnabled, Mode=TwoWay}"
+                                  IsEnabled="{Binding CanEditProtectedSettings}"/>
                 </fa:SettingsExpander.Footer>
                 <fa:SettingsExpanderItem>
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="8" IsEnabled="{Binding CanEditProtectedSettings}">
                         <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding GachaSummaryText}"/>
                         <Separator Margin="0,4,0,2"/>
 
-                        <TextBlock Text="U盘身份验证"/>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ToggleSwitch IsChecked="{Binding IsUsbAuthRequired, Mode=TwoWay}"/>
-                            <TextBlock VerticalAlignment="Center" Opacity="0.72" Text="启用后，只有验证通过才允许保底模式生效。"/>
-                        </StackPanel>
-
-                        <TextBlock Text="授权文件名"/>
-                        <TextBox Width="260"
-                                 Text="{Binding UsbAuthFileName, Mode=TwoWay}"
-                                 Watermark="IslandCaller.auth"/>
-
-                        <TextBlock Text="授权密钥"/>
-                        <TextBox Width="320"
-                                 Text="{Binding UsbAuthToken, Mode=TwoWay}"
-                                 Watermark="与 U 盘根目录授权文件内容一致"/>
-
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Command="{Binding RefreshUsbAuthCommand}">立即验证</Button>
-                            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding UsbAuthStatusSummary}"/>
-                        </StackPanel>
-                        <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding UsbAuthStatusText}"/>
+                        <TextBlock Opacity="0.72"
+                                   TextWrapping="Wrap"
+                                   Text="启用U盘验证后，插入授权U盘才可修改下方配置。"/>
 
                         <TextBlock Text="五星候选配置"/>
                         <DataGrid ItemsSource="{Binding ProfileList}" RowHeight="40" MaxHeight="260">
@@ -138,7 +200,7 @@
                                 </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
-                        <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="将成员设置为 5 表示五星候选。系统每天会从五星候选中随机 1 人作为五星 UP，并从剩余非五星成员中随机 3 人作为四星 UP。其余情况下默认按公平抽选算法参与抽取。"/>
+                        <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="星级设为 5 即加入五星候选。系统每天随机 1 名五星 UP，并从其余成员中随机 3 名四星 UP。"/>
 
                         <TextBlock Text="五星基础概率"/>
                         <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding IsGachaEnabled}">
@@ -179,9 +241,9 @@
                 </fa:SettingsExpanderItem>
             </fa:SettingsExpander>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE823;}" Header="历史记录与统计" Description="查看成员历史、近期点名和当前保底状态">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE823;}" Header="历史记录与统计" Description="查看历史和保底状态">
                 <fa:SettingsExpanderItem>
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="8" IsEnabled="{Binding CanEditProtectedSettings}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Click="RefreshHistoryStatsButton_OnClick">刷新历史和统计</Button>
                             <Button Click="ClearButton_OnClick"
@@ -219,9 +281,10 @@
             <Separator Margin="0 12 0 4"/>
             <ci:IconText Glyph="&#xF485;" Text="悬浮窗设置" Margin="0,0,0,4"/>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xF485;}" Header="启用悬浮窗" Description="显示点名悬浮窗">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xF485;}" Header="启用悬浮窗" Description="显示悬浮窗">
                 <fa:SettingsExpander.Footer>
-                    <ToggleSwitch IsChecked="{Binding IsHoverEnable, Mode=TwoWay}"/>
+                    <ToggleSwitch IsChecked="{Binding IsHoverEnable, Mode=TwoWay}"
+                                  IsEnabled="{Binding CanEditProtectedSettings}"/>
                 </fa:SettingsExpander.Footer>
             </fa:SettingsExpander>
 
@@ -231,6 +294,7 @@
                             Width="180"
                             TickFrequency="0.05"
                             IsSnapToTickEnabled="True"
+                            IsEnabled="{Binding CanEditProtectedSettings}"
                             Classes="auto-tooltip"
                             ci3:SliderDragTooltipAssist.StringFormat="F2"
                             Value="{Binding HoverScalingFactor, Mode=TwoWay}"/>
@@ -240,9 +304,9 @@
             <Separator Margin="0 12 0 4"/>
             <ci:IconText Glyph="&#xF1F4;" Text="档案设置" Margin="0,0,0,4"/>
 
-            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xF20C;}" Header="档案编辑" Description="编辑点名成员、星级与 UP 状态">
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xF20C;}" Header="档案编辑" Description="编辑成员和权重">
                 <fa:SettingsExpanderItem>
-                    <StackPanel Spacing="8">
+                    <StackPanel Spacing="8" IsEnabled="{Binding CanEditProtectedSettings}">
                         <Border Padding="12"
                                 CornerRadius="8"
                                 Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
@@ -305,6 +369,7 @@
                     </StackPanel>
                 </fa:SettingsExpanderItem>
             </fa:SettingsExpander>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </ci2:SettingsPageBase>

@@ -38,38 +38,43 @@ namespace IslandCaller.Models
 
         private void InitializeNewInstall()
         {
-            RegistryKey? IsC_RootKey = Registry.CurrentUser.CreateSubKey(@"Software\IslandCaller", writable: true);
-            RegistryKey? IsC_GeneralKey = IsC_RootKey?.CreateSubKey("General", writable: true);
-            RegistryKey? IsC_GachaKey = IsC_RootKey?.CreateSubKey("Gacha", writable: true);
-            RegistryKey? IsC_ProfileKey = IsC_RootKey?.CreateSubKey("Profile", writable: true);
-            RegistryKey? IsC_HoverKey = IsC_RootKey?.CreateSubKey("Hover", writable: true);
-            RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.CreateSubKey("Position", writable: true);
+            using (SettingsWriteGate.Bypass())
+            {
+                RegistryKey? IsC_RootKey = Registry.CurrentUser.CreateSubKey(@"Software\IslandCaller", writable: true);
+                RegistryKey? IsC_GeneralKey = IsC_RootKey?.CreateSubKey("General", writable: true);
+                RegistryKey? IsC_GachaKey = IsC_RootKey?.CreateSubKey("Gacha", writable: true);
+                RegistryKey? IsC_UsbAuthKey = IsC_RootKey?.CreateSubKey("UsbAuth", writable: true);
+                RegistryKey? IsC_ProfileKey = IsC_RootKey?.CreateSubKey("Profile", writable: true);
+                RegistryKey? IsC_HoverKey = IsC_RootKey?.CreateSubKey("Hover", writable: true);
+                RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.CreateSubKey("Position", writable: true);
 
-            IsC_GeneralKey?.SetValue("BreakDisable", Instance.General.BreakDisable);
-            IsC_GeneralKey?.SetValue("EnableGlobalHotkeys", Instance.General.EnableGlobalHotkeys);
-            IsC_GeneralKey?.SetValue("QuickCallHotkey", Instance.General.QuickCallHotkey);
-            IsC_GeneralKey?.SetValue("AdvancedCallHotkey", Instance.General.AdvancedCallHotkey);
-            IsC_GeneralKey?.SetValue("EnableGuarantee", Instance.General.EnableGuarantee);
-            IsC_GeneralKey?.SetValue("GuaranteeThreshold", Instance.General.GuaranteeThreshold);
-            IsC_GeneralKey?.SetValue("GuaranteeListText", Instance.General.GuaranteeListText);
-            IsC_GeneralKey?.SetValue("GuaranteeWeightListJson", Instance.General.GuaranteeWeightListJson);
-            IsC_GeneralKey?.SetValue("LotteryPrizeListJson", Instance.General.LotteryPrizeListJson);
-            IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
-            IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
-            IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
-            SaveGachaSettings(IsC_GachaKey);
-            IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
-            IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
-            IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
-            IsC_ProfileKey?.SetValue("ProfileList", JsonSerializer.Serialize(Instance.Profile.ProfileList));
-            IsC_ProfileKey?.SetValue("PreferProfile", JsonSerializer.Serialize(Instance.Profile.ProfilePrefer));
-            IsC_HoverKey?.SetValue("IsEnable", Instance.Hover.IsEnable);
-            IsC_HoverKey?.SetValue("ScalingFactor", Instance.Hover.ScalingFactor);
-            IsC_HoverKey_Position?.SetValue("X", Instance.Hover.Position.X);
-            IsC_HoverKey_Position?.SetValue("Y", Instance.Hover.Position.Y);
+                IsC_GeneralKey?.SetValue("BreakDisable", Instance.General.BreakDisable);
+                IsC_GeneralKey?.SetValue("EnableGlobalHotkeys", Instance.General.EnableGlobalHotkeys);
+                IsC_GeneralKey?.SetValue("QuickCallHotkey", Instance.General.QuickCallHotkey);
+                IsC_GeneralKey?.SetValue("AdvancedCallHotkey", Instance.General.AdvancedCallHotkey);
+                IsC_GeneralKey?.SetValue("EnableGuarantee", Instance.General.EnableGuarantee);
+                IsC_GeneralKey?.SetValue("GuaranteeThreshold", Instance.General.GuaranteeThreshold);
+                IsC_GeneralKey?.SetValue("GuaranteeListText", Instance.General.GuaranteeListText);
+                IsC_GeneralKey?.SetValue("GuaranteeWeightListJson", Instance.General.GuaranteeWeightListJson);
+                IsC_GeneralKey?.SetValue("LotteryPrizeListJson", Instance.General.LotteryPrizeListJson);
+                IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
+                IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
+                IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
+                SaveGachaSettings(IsC_GachaKey);
+                SaveUsbAuthSettings(IsC_UsbAuthKey);
+                IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
+                IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
+                IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
+                IsC_ProfileKey?.SetValue("ProfileList", JsonSerializer.Serialize(Instance.Profile.ProfileList));
+                IsC_ProfileKey?.SetValue("PreferProfile", JsonSerializer.Serialize(Instance.Profile.ProfilePrefer));
+                IsC_HoverKey?.SetValue("IsEnable", Instance.Hover.IsEnable);
+                IsC_HoverKey?.SetValue("ScalingFactor", Instance.Hover.ScalingFactor);
+                IsC_HoverKey_Position?.SetValue("X", Instance.Hover.Position.X);
+                IsC_HoverKey_Position?.SetValue("Y", Instance.Hover.Position.Y);
 
-            ProfileService.CreateDemoProfile(Instance.Profile.DefaultProfile);
-            ClassIsland.Core.Controls.CommonTaskDialogs.ShowDialog("Welcome", "欢迎使用IslandCaller2.0");
+                ProfileService.CreateDemoProfile(Instance.Profile.DefaultProfile);
+                ClassIsland.Core.Controls.CommonTaskDialogs.ShowDialog("Welcome", "欢迎使用IslandCaller2.0");
+            }
         }
 
         public void Load()
@@ -77,6 +82,7 @@ namespace IslandCaller.Models
             RegistryKey? IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
             RegistryKey? IsC_GeneralKey;
             RegistryKey? IsC_GachaKey;
+            RegistryKey? IsC_UsbAuthKey;
             RegistryKey? IsC_ProfileKey;
             RegistryKey? IsC_HoverKey;
             RegistryKey? IsC_HoverKey_Position;
@@ -97,32 +103,38 @@ namespace IslandCaller.Models
 
                 IsC_GeneralKey = IsC_RootKey?.OpenSubKey("General", writable: true);
                 IsC_GachaKey = IsC_RootKey?.OpenSubKey("Gacha", writable: true) ?? IsC_RootKey?.CreateSubKey("Gacha", writable: true);
+                IsC_UsbAuthKey = IsC_RootKey?.OpenSubKey("UsbAuth", writable: true) ?? IsC_RootKey?.CreateSubKey("UsbAuth", writable: true);
                 IsC_ProfileKey = IsC_RootKey?.OpenSubKey("Profile", writable: true);
                 IsC_HoverKey = IsC_RootKey?.OpenSubKey("Hover", writable: true);
                 IsC_HoverKey_Position = IsC_HoverKey?.OpenSubKey("Position", writable: true);
 
-                Instance.General.BreakDisable = Convert.ToBoolean(IsC_GeneralKey?.GetValue("BreakDisable") ?? true);
-                Instance.General.EnableGlobalHotkeys = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGlobalHotkeys") ?? true);
-                Instance.General.QuickCallHotkey = (IsC_GeneralKey?.GetValue("QuickCallHotkey") as string) ?? "Ctrl+Alt+R";
-                Instance.General.AdvancedCallHotkey = (IsC_GeneralKey?.GetValue("AdvancedCallHotkey") as string) ?? "Ctrl+Alt+G";
-                Instance.General.EnableGuarantee = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGuarantee") ?? false);
-                Instance.General.GuaranteeThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("GuaranteeThreshold") ?? 40);
-                Instance.General.GuaranteeListText = (IsC_GeneralKey?.GetValue("GuaranteeListText") as string) ?? string.Empty;
-                Instance.General.GuaranteeWeightListJson = (IsC_GeneralKey?.GetValue("GuaranteeWeightListJson") as string) ?? "[]";
-                Instance.General.LotteryPrizeListJson = (IsC_GeneralKey?.GetValue("LotteryPrizeListJson") as string) ?? "[]";
-                Instance.General.PacerListJson = (IsC_GeneralKey?.GetValue("PacerListJson") as string) ?? "[]";
-                Instance.General.PacerListDate = (IsC_GeneralKey?.GetValue("PacerListDate") as string) ?? string.Empty;
-                Instance.General.PacerThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("PacerThreshold") ?? 50);
-                LoadGachaSettings(IsC_GachaKey);
-                Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));
-                Instance.Profile.DefaultProfile = Guid.Parse((IsC_ProfileKey?.GetValue("DefaultProfileName") as string) ?? Guid.Empty.ToString());
-                Instance.Profile.IsPreferProfile = Convert.ToBoolean(IsC_ProfileKey?.GetValue("IsPreferProfile") ?? false);
-                Instance.Profile.ProfileList = JsonSerializer.Deserialize<Dictionary<Guid, string>>(((IsC_ProfileKey?.GetValue("ProfileList") as string) ?? "{}")) ?? new();
-                Instance.Profile.ProfilePrefer = JsonSerializer.Deserialize<Dictionary<Guid, string>>(((IsC_ProfileKey?.GetValue("PreferProfile") as string) ?? "{}")) ?? new();
-                Instance.Hover.IsEnable = Convert.ToBoolean(IsC_HoverKey?.GetValue("IsEnable") ?? true);
-                Instance.Hover.ScalingFactor = Convert.ToDouble(IsC_HoverKey?.GetValue("ScalingFactor") ?? 1.0);
-                Instance.Hover.Position.X = Convert.ToDouble(IsC_HoverKey_Position?.GetValue("X") ?? 200.0);
-                Instance.Hover.Position.Y = Convert.ToDouble(IsC_HoverKey_Position?.GetValue("Y") ?? 200.0);
+                using (SettingsWriteGate.Bypass())
+                {
+                    Instance.General.BreakDisable = Convert.ToBoolean(IsC_GeneralKey?.GetValue("BreakDisable") ?? true);
+                    Instance.General.EnableGlobalHotkeys = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGlobalHotkeys") ?? true);
+                    Instance.General.QuickCallHotkey = (IsC_GeneralKey?.GetValue("QuickCallHotkey") as string) ?? "Ctrl+Alt+R";
+                    Instance.General.AdvancedCallHotkey = (IsC_GeneralKey?.GetValue("AdvancedCallHotkey") as string) ?? "Ctrl+Alt+G";
+                    Instance.General.EnableGuarantee = Convert.ToBoolean(IsC_GeneralKey?.GetValue("EnableGuarantee") ?? false);
+                    Instance.General.GuaranteeThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("GuaranteeThreshold") ?? 40);
+                    Instance.General.GuaranteeListText = (IsC_GeneralKey?.GetValue("GuaranteeListText") as string) ?? string.Empty;
+                    Instance.General.GuaranteeWeightListJson = (IsC_GeneralKey?.GetValue("GuaranteeWeightListJson") as string) ?? "[]";
+                    Instance.General.LotteryPrizeListJson = (IsC_GeneralKey?.GetValue("LotteryPrizeListJson") as string) ?? "[]";
+                    Instance.General.PacerListJson = (IsC_GeneralKey?.GetValue("PacerListJson") as string) ?? "[]";
+                    Instance.General.PacerListDate = (IsC_GeneralKey?.GetValue("PacerListDate") as string) ?? string.Empty;
+                    Instance.General.PacerThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("PacerThreshold") ?? 50);
+                    LoadGachaSettings(IsC_GachaKey);
+                    LoadUsbAuthSettings(IsC_UsbAuthKey, IsC_GachaKey);
+                    Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));
+                    Instance.Profile.DefaultProfile = Guid.Parse((IsC_ProfileKey?.GetValue("DefaultProfileName") as string) ?? Guid.Empty.ToString());
+                    Instance.Profile.IsPreferProfile = Convert.ToBoolean(IsC_ProfileKey?.GetValue("IsPreferProfile") ?? false);
+                    Instance.Profile.ProfileList = JsonSerializer.Deserialize<Dictionary<Guid, string>>(((IsC_ProfileKey?.GetValue("ProfileList") as string) ?? "{}")) ?? new();
+                    Instance.Profile.ProfilePrefer = JsonSerializer.Deserialize<Dictionary<Guid, string>>(((IsC_ProfileKey?.GetValue("PreferProfile") as string) ?? "{}")) ?? new();
+                    Instance.Hover.IsEnable = Convert.ToBoolean(IsC_HoverKey?.GetValue("IsEnable") ?? true);
+                    Instance.Hover.ScalingFactor = Convert.ToDouble(IsC_HoverKey?.GetValue("ScalingFactor") ?? 1.0);
+                    Instance.Hover.Position.X = Convert.ToDouble(IsC_HoverKey_Position?.GetValue("X") ?? 200.0);
+                    Instance.Hover.Position.Y = Convert.ToDouble(IsC_HoverKey_Position?.GetValue("Y") ?? 200.0);
+                }
+
                 Save();
             }
 
@@ -134,6 +146,7 @@ namespace IslandCaller.Models
             RegistryKey? IsC_RootKey = Registry.CurrentUser.OpenSubKey(@"Software\IslandCaller", writable: true);
             RegistryKey? IsC_GeneralKey = IsC_RootKey?.OpenSubKey("General", writable: true);
             RegistryKey? IsC_GachaKey = IsC_RootKey?.OpenSubKey("Gacha", writable: true) ?? IsC_RootKey?.CreateSubKey("Gacha", writable: true);
+            RegistryKey? IsC_UsbAuthKey = IsC_RootKey?.OpenSubKey("UsbAuth", writable: true) ?? IsC_RootKey?.CreateSubKey("UsbAuth", writable: true);
             RegistryKey? IsC_ProfileKey = IsC_RootKey?.OpenSubKey("Profile", writable: true);
             RegistryKey? IsC_HoverKey = IsC_RootKey?.OpenSubKey("Hover", writable: true);
             RegistryKey? IsC_HoverKey_Position = IsC_HoverKey?.OpenSubKey("Position", writable: true);
@@ -151,6 +164,7 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
             IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
             SaveGachaSettings(IsC_GachaKey);
+            SaveUsbAuthSettings(IsC_UsbAuthKey);
             IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
             IsC_ProfileKey?.SetValue("DefaultProfileName", Instance.Profile.DefaultProfile.ToString());
             IsC_ProfileKey?.SetValue("IsPreferProfile", Instance.Profile.IsPreferProfile);
@@ -180,6 +194,14 @@ namespace IslandCaller.Models
             gachaKey?.SetValue("FourStarFeaturedRate", Instance.Gacha.FourStarFeaturedRate);
         }
 
+        private static void SaveUsbAuthSettings(RegistryKey? usbAuthKey)
+        {
+            usbAuthKey?.SetValue("Enabled", Instance.UsbAuth.Enabled);
+            usbAuthKey?.SetValue("AuthFileName", Instance.UsbAuth.AuthFileName);
+            usbAuthKey?.SetValue("PublicKey", Instance.UsbAuth.PublicKey);
+            usbAuthKey?.SetValue("ProtectedPrivateKey", Instance.UsbAuth.ProtectedPrivateKey);
+        }
+
         private static void LoadGachaSettings(RegistryKey? gachaKey)
         {
             Instance.Gacha.Enabled = Convert.ToBoolean(gachaKey?.GetValue("Enabled") ?? false);
@@ -197,6 +219,20 @@ namespace IslandCaller.Models
             Instance.Gacha.FiveStarFeaturedRate = Convert.ToDouble(gachaKey?.GetValue("FiveStarFeaturedRate") ?? 0.5);
             Instance.Gacha.FourStarFeaturedRate = Convert.ToDouble(gachaKey?.GetValue("FourStarFeaturedRate") ?? 0.5);
         }
+
+        private static void LoadUsbAuthSettings(RegistryKey? usbAuthKey, RegistryKey? legacyGachaKey)
+        {
+            string publicKey = (usbAuthKey?.GetValue("PublicKey") as string) ?? string.Empty;
+            bool legacyEnabled = Convert.ToBoolean(legacyGachaKey?.GetValue("RequireUsbAuth") ?? false);
+            string legacyFileName = UsbAuthService.NormalizeAuthFileName(legacyGachaKey?.GetValue("UsbAuthFileName") as string);
+
+            Instance.UsbAuth.AuthFileName = UsbAuthService.NormalizeAuthFileName(
+                (usbAuthKey?.GetValue("AuthFileName") as string) ?? legacyFileName);
+            Instance.UsbAuth.PublicKey = publicKey;
+            Instance.UsbAuth.ProtectedPrivateKey = (usbAuthKey?.GetValue("ProtectedPrivateKey") as string) ?? string.Empty;
+            Instance.UsbAuth.Enabled = !string.IsNullOrWhiteSpace(publicKey)
+                && Convert.ToBoolean(usbAuthKey?.GetValue("Enabled") ?? legacyEnabled);
+        }
     }
     public static class SettingsBinder
     {
@@ -205,6 +241,7 @@ namespace IslandCaller.Models
             // General
             model.General.PropertyChanged += (_, _) => onChange();
             model.Gacha.PropertyChanged += (_, _) => onChange();
+            model.UsbAuth.PropertyChanged += (_, _) => onChange();
 
             // Hover
             model.Hover.PropertyChanged += (_, _) => onChange();

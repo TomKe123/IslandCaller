@@ -163,6 +163,11 @@ namespace IslandCaller.Services
         public void SaveProfile(Guid guid, List<Person> members)
         {
             var logger = IAppHost.GetService<ILogger<ProfileService>>();
+            if (!SettingsWriteGate.CanModifyProtectedSettings())
+            {
+                throw new InvalidOperationException("当前未通过U盘验证，无法修改档案配置。");
+            }
+
             members = members.OrderBy(x => x.Id).ToList();
             string basePath = GetBasePath();
 

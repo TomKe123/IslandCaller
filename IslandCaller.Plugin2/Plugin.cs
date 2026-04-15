@@ -36,6 +36,7 @@ namespace IslandCaller
             services.AddSingleton<CoreService>();
             services.AddSingleton<GlobalHotkeyService>();
             services.AddSingleton<UsbAuthService>();
+            services.AddSingleton<UsbAuthProvisioningService>();
             services.AddSingleton<WindowDragHelper>();
             services.AddSingleton<WindowTopmostHelper>();
             services.AddTransient<HoverFluentViewModel>();

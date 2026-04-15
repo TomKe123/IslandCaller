@@ -21,6 +21,7 @@ namespace IslandCaller.ViewModels
         private readonly CoreService _coreService;
         private readonly LotteryService _lotteryService;
         private readonly UsbAuthService _usbAuthService;
+        private readonly UsbAuthProvisioningService _usbAuthProvisioningService;
         private readonly Plugin _plugin;
 
         // 基本设置
@@ -80,25 +81,67 @@ namespace IslandCaller.ViewModels
             set => this.RaiseAndSetIfChanged(ref _isGachaEnabled, value);
         }
 
-        private bool _isUsbAuthRequired;
-        public bool IsUsbAuthRequired
+        public sealed class UsbDriveItemModel : ReactiveObject
         {
-            get => _isUsbAuthRequired;
-            set => this.RaiseAndSetIfChanged(ref _isUsbAuthRequired, value);
+            public UsbDriveItemModel(UsbDriveInfo driveInfo)
+            {
+                DriveInfo = driveInfo;
+            }
+
+            public UsbDriveInfo DriveInfo { get; }
+            public string DisplayName => DriveInfo.DisplayName;
+            public string RootPath => DriveInfo.RootPath;
+            public bool HasAuthorizationFile => DriveInfo.HasAuthorizationFile;
+            public string StateText => HasAuthorizationFile ? "已存在授权文件" : "未写入授权文件";
         }
 
-        private string _usbAuthFileName = string.Empty;
-        public string UsbAuthFileName
+        private bool _isUsbAuthEnabled;
+        public bool IsUsbAuthEnabled
         {
-            get => _usbAuthFileName;
-            set => this.RaiseAndSetIfChanged(ref _usbAuthFileName, value);
+            get => _isUsbAuthEnabled;
+            set => this.RaiseAndSetIfChanged(ref _isUsbAuthEnabled, value);
         }
 
-        private string _usbAuthToken = string.Empty;
-        public string UsbAuthToken
+        private ObservableCollection<UsbDriveItemModel> _removableDrives = [];
+        public ObservableCollection<UsbDriveItemModel> RemovableDrives
         {
-            get => _usbAuthToken;
-            set => this.RaiseAndSetIfChanged(ref _usbAuthToken, value);
+            get => _removableDrives;
+            set => this.RaiseAndSetIfChanged(ref _removableDrives, value);
+        }
+
+        private UsbDriveItemModel? _selectedDrive;
+        public UsbDriveItemModel? SelectedDrive
+        {
+            get => _selectedDrive;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _selectedDrive, value);
+                RefreshUsbAuthComputedState();
+            }
+        }
+
+        private string _authFileName = string.Empty;
+        public string AuthFileName
+        {
+            get => _authFileName;
+            set
+            {
+                string normalized = UsbAuthService.NormalizeAuthFileName(value);
+                if (_authFileName == normalized)
+                {
+                    return;
+                }
+
+                this.RaiseAndSetIfChanged(ref _authFileName, normalized);
+                if (CanModifyUsbAuthConfiguration)
+                {
+                    Settings.Instance.UsbAuth.AuthFileName = normalized;
+                    RefreshUsbAuthSection();
+                    return;
+                }
+
+                LoadAuthFileNameFromSettings();
+            }
         }
 
         private string _usbAuthStatusSummary = string.Empty;
@@ -120,6 +163,90 @@ namespace IslandCaller.ViewModels
         {
             get => _isUsbAuthVerified;
             set => this.RaiseAndSetIfChanged(ref _isUsbAuthVerified, value);
+        }
+
+        private bool _canEditProtectedSettings = true;
+        public bool CanEditProtectedSettings
+        {
+            get => _canEditProtectedSettings;
+            set => this.RaiseAndSetIfChanged(ref _canEditProtectedSettings, value);
+        }
+
+        private bool _isProtectedSettingsLocked;
+        public bool IsProtectedSettingsLocked
+        {
+            get => _isProtectedSettingsLocked;
+            set => this.RaiseAndSetIfChanged(ref _isProtectedSettingsLocked, value);
+        }
+
+        private string _protectedSettingsLockText = string.Empty;
+        public string ProtectedSettingsLockText
+        {
+            get => _protectedSettingsLockText;
+            set => this.RaiseAndSetIfChanged(ref _protectedSettingsLockText, value);
+        }
+
+        private string _keyFingerprint = string.Empty;
+        public string KeyFingerprint
+        {
+            get => _keyFingerprint;
+            set => this.RaiseAndSetIfChanged(ref _keyFingerprint, value);
+        }
+
+        private bool _canModifyUsbAuthConfiguration;
+        public bool CanModifyUsbAuthConfiguration
+        {
+            get => _canModifyUsbAuthConfiguration;
+            set => this.RaiseAndSetIfChanged(ref _canModifyUsbAuthConfiguration, value);
+        }
+
+        private bool _canWriteAuthorization;
+        public bool CanWriteAuthorization
+        {
+            get => _canWriteAuthorization;
+            set => this.RaiseAndSetIfChanged(ref _canWriteAuthorization, value);
+        }
+
+        private bool _canDisableProtection;
+        public bool CanDisableProtection
+        {
+            get => _canDisableProtection;
+            set => this.RaiseAndSetIfChanged(ref _canDisableProtection, value);
+        }
+
+        private bool _canRegenerateKeyPair;
+        public bool CanRegenerateKeyPair
+        {
+            get => _canRegenerateKeyPair;
+            set => this.RaiseAndSetIfChanged(ref _canRegenerateKeyPair, value);
+        }
+
+        private string _writeButtonText = string.Empty;
+        public string WriteButtonText
+        {
+            get => _writeButtonText;
+            set => this.RaiseAndSetIfChanged(ref _writeButtonText, value);
+        }
+
+        private string _selectedDriveHint = string.Empty;
+        public string SelectedDriveHint
+        {
+            get => _selectedDriveHint;
+            set => this.RaiseAndSetIfChanged(ref _selectedDriveHint, value);
+        }
+
+        private string _usbAuthGuideText = string.Empty;
+        public string UsbAuthGuideText
+        {
+            get => _usbAuthGuideText;
+            set => this.RaiseAndSetIfChanged(ref _usbAuthGuideText, value);
+        }
+
+        private string _usbAuthActionMessage = string.Empty;
+        public string UsbAuthActionMessage
+        {
+            get => _usbAuthActionMessage;
+            set => this.RaiseAndSetIfChanged(ref _usbAuthActionMessage, value);
         }
 
         private double _fiveStarBaseRate;
@@ -319,9 +446,35 @@ namespace IslandCaller.ViewModels
             GuaranteeWeightList.Remove(row);
         });
 
-        public ICommand RefreshUsbAuthCommand => new RelayCommand(() =>
+        public ICommand RefreshUsbDrivesCommand => new RelayCommand(() =>
         {
-            RefreshUsbAuthStatus(_historyService);
+            RefreshUsbAuthSection();
+        });
+
+        public ICommand WriteAuthorizationFileCommand => new RelayCommand(() =>
+        {
+            if (SelectedDrive == null)
+            {
+                return;
+            }
+
+            var result = _usbAuthProvisioningService.WriteAuthorizationAndEnable(SelectedDrive.DriveInfo);
+            UsbAuthActionMessage = result.Message;
+            RefreshUsbAuthSection();
+        });
+
+        public ICommand DisableUsbAuthCommand => new RelayCommand(() =>
+        {
+            var result = _usbAuthProvisioningService.DisableProtection();
+            UsbAuthActionMessage = result.Message;
+            RefreshUsbAuthSection();
+        });
+
+        public ICommand RegenerateKeyPairCommand => new RelayCommand(() =>
+        {
+            var result = _usbAuthProvisioningService.RegenerateKeyPair();
+            UsbAuthActionMessage = result.Message;
+            RefreshUsbAuthSection();
         });
 
         public ICommand AddLotteryPrizeCommand => new RelayCommand(() =>
@@ -528,6 +681,7 @@ namespace IslandCaller.ViewModels
             _coreService = IAppHost.GetService<CoreService>();
             _lotteryService = IAppHost.GetService<LotteryService>();
             _usbAuthService = IAppHost.GetService<UsbAuthService>();
+            _usbAuthProvisioningService = IAppHost.GetService<UsbAuthProvisioningService>();
             _plugin = IAppHost.GetService<Plugin>();
 
             // 初始化默认值
@@ -539,9 +693,8 @@ namespace IslandCaller.ViewModels
             GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
             PacerThreshold = Settings.Instance.General.PacerThreshold;
             IsGachaEnabled = Settings.Instance.Gacha.Enabled;
-            IsUsbAuthRequired = Settings.Instance.Gacha.RequireUsbAuth;
-            UsbAuthFileName = UsbAuthService.NormalizeAuthFileName(Settings.Instance.Gacha.UsbAuthFileName);
-            UsbAuthToken = Settings.Instance.Gacha.UsbAuthToken;
+            IsUsbAuthEnabled = Settings.Instance.UsbAuth.Enabled;
+            LoadAuthFileNameFromSettings();
             FiveStarBaseRate = Settings.Instance.Gacha.FiveStarBaseRate;
             FiveStarSoftPityStart = Settings.Instance.Gacha.FiveStarSoftPityStart;
             FiveStarHardPity = Settings.Instance.Gacha.FiveStarHardPity;
@@ -571,9 +724,13 @@ namespace IslandCaller.ViewModels
                 IsFeatured = m.IsFeatured
             });
             ProfileList = new ObservableCollection<StudentModel>(profile);
-            ApplyUsbAuthSnapshot(_usbAuthService.RefreshStatus(forceRefresh: true));
+            RefreshUsbAuthSection(refreshHistory: false);
             UpdateLotterySummary();
             UpdateProfileSummary();
+            RefreshProtectedSettingsLockState();
+            _usbAuthService.StatusChanged += (_, snapshot) => Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyUsbAuthSnapshot(snapshot));
+            _usbAuthService.DrivesChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => RefreshUsbAuthSection(refreshHistory: false));
+            Settings.Instance.UsbAuth.PropertyChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => RefreshUsbAuthSection(refreshHistory: false));
 
             this.PropertyChanged += (sender, args) =>
             {
@@ -624,8 +781,9 @@ namespace IslandCaller.ViewModels
                 {
                     if (IsGachaEnabled)
                     {
-                        var authSnapshot = RefreshUsbAuthStatus(_historyService);
-                        if (authSnapshot.IsRequired && !authSnapshot.IsVerified)
+                        var authSnapshot = _usbAuthService.RefreshStatus(forceRefresh: true);
+                        ApplyUsbAuthSnapshot(authSnapshot);
+                        if (Settings.Instance.UsbAuth.Enabled && !authSnapshot.IsVerified)
                         {
                             IsGachaEnabled = false;
                             return;
@@ -635,28 +793,6 @@ namespace IslandCaller.ViewModels
                     Settings.Instance.Gacha.Enabled = IsGachaEnabled;
                     RefreshHistoryAndStatistics(_historyService);
                     UpdateGachaSummary(_historyService);
-                }
-                else if (args.PropertyName == nameof(IsUsbAuthRequired))
-                {
-                    Settings.Instance.Gacha.RequireUsbAuth = IsUsbAuthRequired;
-                    HandleUsbAuthConfigurationChanged(_historyService);
-                }
-                else if (args.PropertyName == nameof(UsbAuthFileName))
-                {
-                    string normalized = UsbAuthService.NormalizeAuthFileName(UsbAuthFileName);
-                    Settings.Instance.Gacha.UsbAuthFileName = normalized;
-                    if (!string.Equals(UsbAuthFileName, normalized, StringComparison.Ordinal))
-                    {
-                        UsbAuthFileName = normalized;
-                        return;
-                    }
-
-                    HandleUsbAuthConfigurationChanged(_historyService);
-                }
-                else if (args.PropertyName == nameof(UsbAuthToken))
-                {
-                    Settings.Instance.Gacha.UsbAuthToken = UsbAuthToken ?? string.Empty;
-                    HandleUsbAuthConfigurationChanged(_historyService);
                 }
                 else if (args.PropertyName == nameof(FiveStarBaseRate))
                 {
@@ -1067,29 +1203,99 @@ namespace IslandCaller.ViewModels
                 $"五星小保底歪后额外有 {0.1:P0} 概率触发捕获明光，累计触发 {pityState.CapturedRadianceCount} 次。";
         }
 
-        private void HandleUsbAuthConfigurationChanged(HistoryService historyService)
+        private void RefreshUsbAuthSection(bool refreshHistory = true)
         {
-            var snapshot = RefreshUsbAuthStatus(historyService);
-            if (IsGachaEnabled && snapshot.IsRequired && !snapshot.IsVerified)
+            var drives = _usbAuthService.GetRemovableDrives(forceRefresh: true)
+                .Select(x => new UsbDriveItemModel(x))
+                .ToList();
+            var snapshot = _usbAuthService.RefreshStatus(forceRefresh: true);
+            string? selectedRoot = SelectedDrive?.RootPath;
+
+            RemovableDrives = new ObservableCollection<UsbDriveItemModel>(drives);
+            SelectedDrive = RemovableDrives.FirstOrDefault(x => string.Equals(x.RootPath, selectedRoot, StringComparison.OrdinalIgnoreCase))
+                ?? RemovableDrives.FirstOrDefault();
+
+            LoadAuthFileNameFromSettings();
+            ApplyUsbAuthSnapshot(snapshot);
+            KeyFingerprint = _usbAuthProvisioningService.GetKeyFingerprint();
+            RefreshUsbAuthComputedState(snapshot);
+            UsbAuthActionMessage = string.IsNullOrWhiteSpace(UsbAuthActionMessage) ? snapshot.Detail : UsbAuthActionMessage;
+
+            if (IsGachaEnabled && Settings.Instance.UsbAuth.Enabled && !snapshot.IsVerified)
             {
                 IsGachaEnabled = false;
             }
-        }
 
-        private UsbAuthSnapshot RefreshUsbAuthStatus(HistoryService historyService)
-        {
-            var snapshot = _usbAuthService.RefreshStatus(forceRefresh: true);
-            ApplyUsbAuthSnapshot(snapshot);
-            UpdateGachaSummary(historyService);
-            RefreshHistoryAndStatistics(historyService);
-            return snapshot;
+            if (!refreshHistory)
+            {
+                return;
+            }
+
+            UpdateGachaSummary(_historyService);
+            RefreshHistoryAndStatistics(_historyService);
         }
 
         private void ApplyUsbAuthSnapshot(UsbAuthSnapshot snapshot)
         {
+            IsUsbAuthEnabled = Settings.Instance.UsbAuth.Enabled;
             IsUsbAuthVerified = snapshot.IsVerified;
             UsbAuthStatusSummary = snapshot.Summary;
             UsbAuthStatusText = snapshot.Detail;
+            UpdateUsbAuthGuide();
+            RefreshProtectedSettingsLockState();
+        }
+
+        private void RefreshProtectedSettingsLockState()
+        {
+            var snapshot = _usbAuthService.RefreshStatus();
+            bool locked = SettingsWriteGate.IsProtectionActive() && !snapshot.IsVerified;
+            CanEditProtectedSettings = !locked;
+            IsProtectedSettingsLocked = locked;
+            ProtectedSettingsLockText = locked
+                ? "已启用U盘验证，当前未检测到已授权U盘。除当前页中的“U盘验证”区域外，其它配置现已锁定为只读。"
+                : string.Empty;
+        }
+
+        private void LoadAuthFileNameFromSettings()
+        {
+            string normalized = UsbAuthService.NormalizeAuthFileName(Settings.Instance.UsbAuth.AuthFileName);
+            this.RaiseAndSetIfChanged(ref _authFileName, normalized, nameof(AuthFileName));
+        }
+
+        private void RefreshUsbAuthComputedState(UsbAuthSnapshot? snapshot = null)
+        {
+            var currentSnapshot = snapshot ?? _usbAuthService.RefreshStatus();
+            CanModifyUsbAuthConfiguration = _usbAuthProvisioningService.CanManageProvisioning();
+            CanWriteAuthorization = SelectedDrive != null && CanModifyUsbAuthConfiguration;
+            CanDisableProtection = Settings.Instance.UsbAuth.Enabled && currentSnapshot.IsVerified;
+            CanRegenerateKeyPair = CanModifyUsbAuthConfiguration;
+            WriteButtonText = Settings.Instance.UsbAuth.Enabled ? "重写授权文件" : "写入授权并启用";
+            SelectedDriveHint = SelectedDrive == null
+                ? "请先插入U盘，检测到可移动磁盘后写入按钮会自动解锁。"
+                : $"当前目标：{SelectedDrive.DisplayName}，授权文件将写入 {SelectedDrive.DriveInfo.AuthFilePath}";
+        }
+
+        private void UpdateUsbAuthGuide()
+        {
+            List<string> steps =
+            [
+                "使用说明：",
+                "1. 插入需要授权的U盘。",
+                $"2. 确认目标U盘后，点击“{WriteButtonText}”。",
+                "3. 插件会自动生成密钥对，使用私钥签发授权文件，并将加密后的授权文件写入U盘根目录。",
+                "4. 运行期插件只保留公钥进行验签；当U盘拔出后，其它设置区会自动切换为只读。"
+            ];
+
+            if (Settings.Instance.UsbAuth.Enabled)
+            {
+                steps.Add("5. 当前已启用保护。若要关闭或重写授权文件，请先插入已授权U盘。");
+            }
+            else
+            {
+                steps.Add("5. 当前尚未启用保护。首次写入成功后会自动开启U盘验证。");
+            }
+
+            UsbAuthGuideText = string.Join(Environment.NewLine, steps);
         }
 
         private string GetGachaModeStatusText()
@@ -1099,7 +1305,7 @@ namespace IslandCaller.ViewModels
                 return "关闭";
             }
 
-            if (IsUsbAuthRequired && !IsUsbAuthVerified)
+            if (IsUsbAuthEnabled && !IsUsbAuthVerified)
             {
                 return "未生效（等待验证）";
             }

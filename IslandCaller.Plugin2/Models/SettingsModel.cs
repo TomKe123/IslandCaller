@@ -1,22 +1,51 @@
-﻿using static System.Guid;
 using System.ComponentModel;
+using IslandCaller.Services;
+using static System.Guid;
 
 namespace IslandCaller.Models
 {
     public class SettingsModel
     {
-        public GeneralSetting General { get; set; } = new GeneralSetting();
-        public GachaSetting Gacha { get; set; } = new GachaSetting();
-        public ProfileSetting Profile { get; set; } = new ProfileSetting();
-        public HoverSetting Hover { get; set; } = new HoverSetting();
+        public GeneralSetting General { get; set; } = new();
+        public GachaSetting Gacha { get; set; } = new();
+        public UsbAuthSetting UsbAuth { get; set; } = new();
+        public ProfileSetting Profile { get; set; } = new();
+        public HoverSetting Hover { get; set; } = new();
     }
 
-    public class GeneralSetting : INotifyPropertyChanged
+    public abstract class ProtectedSettingsObject : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected bool SetProtectedField<T>(ref T field, T value, string propertyName)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+            {
+                return false;
+            }
+
+            if (!SettingsWriteGate.CanModifyProtectedSettings())
+            {
+                return false;
+            }
+
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
+
+        protected void OnPropertyChanged(string name)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+
+    public class GeneralSetting : ProtectedSettingsObject
     {
         public GeneralSetting()
         {
             _version = new Version(2, 0, 0, 0);
-            _breakdisable = true;
+            _breakDisable = true;
             _enableGlobalHotkeys = true;
             _quickCallHotkey = "Ctrl+Alt+R";
             _advancedCallHotkey = "Ctrl+Alt+G";
@@ -30,102 +59,95 @@ namespace IslandCaller.Models
             _pacerThreshold = 50;
         }
 
-        private Version _version;
-        public Version Version
-        {
-            get => _version;
-        }
+        private readonly Version _version;
+        public Version Version => _version;
 
-        private bool _breakdisable;
+        private bool _breakDisable;
         public bool BreakDisable
         {
-            get => _breakdisable;
-            set { if (_breakdisable != value) { _breakdisable = value; OnPropertyChanged(nameof(BreakDisable)); } }
+            get => _breakDisable;
+            set => SetProtectedField(ref _breakDisable, value, nameof(BreakDisable));
         }
 
         private bool _enableGlobalHotkeys;
         public bool EnableGlobalHotkeys
         {
             get => _enableGlobalHotkeys;
-            set { if (_enableGlobalHotkeys != value) { _enableGlobalHotkeys = value; OnPropertyChanged(nameof(EnableGlobalHotkeys)); } }
+            set => SetProtectedField(ref _enableGlobalHotkeys, value, nameof(EnableGlobalHotkeys));
         }
 
         private string _quickCallHotkey;
         public string QuickCallHotkey
         {
             get => _quickCallHotkey;
-            set { if (_quickCallHotkey != value) { _quickCallHotkey = value; OnPropertyChanged(nameof(QuickCallHotkey)); } }
+            set => SetProtectedField(ref _quickCallHotkey, value, nameof(QuickCallHotkey));
         }
 
         private string _advancedCallHotkey;
         public string AdvancedCallHotkey
         {
             get => _advancedCallHotkey;
-            set { if (_advancedCallHotkey != value) { _advancedCallHotkey = value; OnPropertyChanged(nameof(AdvancedCallHotkey)); } }
+            set => SetProtectedField(ref _advancedCallHotkey, value, nameof(AdvancedCallHotkey));
         }
 
         private bool _enableGuarantee;
         public bool EnableGuarantee
         {
             get => _enableGuarantee;
-            set { if (_enableGuarantee != value) { _enableGuarantee = value; OnPropertyChanged(nameof(EnableGuarantee)); } }
+            set => SetProtectedField(ref _enableGuarantee, value, nameof(EnableGuarantee));
         }
 
         private int _guaranteeThreshold;
         public int GuaranteeThreshold
         {
             get => _guaranteeThreshold;
-            set { if (_guaranteeThreshold != value) { _guaranteeThreshold = value; OnPropertyChanged(nameof(GuaranteeThreshold)); } }
+            set => SetProtectedField(ref _guaranteeThreshold, value, nameof(GuaranteeThreshold));
         }
 
         private string _guaranteeListText;
         public string GuaranteeListText
         {
             get => _guaranteeListText;
-            set { if (_guaranteeListText != value) { _guaranteeListText = value; OnPropertyChanged(nameof(GuaranteeListText)); } }
+            set => SetProtectedField(ref _guaranteeListText, value, nameof(GuaranteeListText));
         }
 
         private string _guaranteeWeightListJson;
         public string GuaranteeWeightListJson
         {
             get => _guaranteeWeightListJson;
-            set { if (_guaranteeWeightListJson != value) { _guaranteeWeightListJson = value; OnPropertyChanged(nameof(GuaranteeWeightListJson)); } }
+            set => SetProtectedField(ref _guaranteeWeightListJson, value, nameof(GuaranteeWeightListJson));
         }
 
         private string _lotteryPrizeListJson;
         public string LotteryPrizeListJson
         {
             get => _lotteryPrizeListJson;
-            set { if (_lotteryPrizeListJson != value) { _lotteryPrizeListJson = value; OnPropertyChanged(nameof(LotteryPrizeListJson)); } }
+            set => SetProtectedField(ref _lotteryPrizeListJson, value, nameof(LotteryPrizeListJson));
         }
 
         private string _pacerListJson;
         public string PacerListJson
         {
             get => _pacerListJson;
-            set { if (_pacerListJson != value) { _pacerListJson = value; OnPropertyChanged(nameof(PacerListJson)); } }
+            set => SetProtectedField(ref _pacerListJson, value, nameof(PacerListJson));
         }
 
         private string _pacerListDate;
         public string PacerListDate
         {
             get => _pacerListDate;
-            set { if (_pacerListDate != value) { _pacerListDate = value; OnPropertyChanged(nameof(PacerListDate)); } }
+            set => SetProtectedField(ref _pacerListDate, value, nameof(PacerListDate));
         }
 
         private int _pacerThreshold;
         public int PacerThreshold
         {
             get => _pacerThreshold;
-            set { if (_pacerThreshold != value) { _pacerThreshold = value; OnPropertyChanged(nameof(PacerThreshold)); } }
+            set => SetProtectedField(ref _pacerThreshold, value, nameof(PacerThreshold));
         }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string name) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    public class GachaSetting : INotifyPropertyChanged
+    public class GachaSetting : ProtectedSettingsObject
     {
         public GachaSetting()
         {
@@ -149,154 +171,188 @@ namespace IslandCaller.Models
         public bool Enabled
         {
             get => _enabled;
-            set { if (_enabled != value) { _enabled = value; OnPropertyChanged(nameof(Enabled)); } }
+            set => SetProtectedField(ref _enabled, value, nameof(Enabled));
         }
 
+        // Legacy fields kept for migration from the token-based USB auth scheme.
         private bool _requireUsbAuth;
         public bool RequireUsbAuth
         {
             get => _requireUsbAuth;
-            set { if (_requireUsbAuth != value) { _requireUsbAuth = value; OnPropertyChanged(nameof(RequireUsbAuth)); } }
+            set => SetProtectedField(ref _requireUsbAuth, value, nameof(RequireUsbAuth));
         }
 
         private string _usbAuthFileName;
         public string UsbAuthFileName
         {
             get => _usbAuthFileName;
-            set { if (_usbAuthFileName != value) { _usbAuthFileName = value; OnPropertyChanged(nameof(UsbAuthFileName)); } }
+            set => SetProtectedField(ref _usbAuthFileName, value, nameof(UsbAuthFileName));
         }
 
         private string _usbAuthToken;
         public string UsbAuthToken
         {
             get => _usbAuthToken;
-            set { if (_usbAuthToken != value) { _usbAuthToken = value; OnPropertyChanged(nameof(UsbAuthToken)); } }
+            set => SetProtectedField(ref _usbAuthToken, value, nameof(UsbAuthToken));
         }
 
         private double _fiveStarBaseRate;
         public double FiveStarBaseRate
         {
             get => _fiveStarBaseRate;
-            set { if (_fiveStarBaseRate != value) { _fiveStarBaseRate = value; OnPropertyChanged(nameof(FiveStarBaseRate)); } }
+            set => SetProtectedField(ref _fiveStarBaseRate, value, nameof(FiveStarBaseRate));
         }
 
         private int _fiveStarSoftPityStart;
         public int FiveStarSoftPityStart
         {
             get => _fiveStarSoftPityStart;
-            set { if (_fiveStarSoftPityStart != value) { _fiveStarSoftPityStart = value; OnPropertyChanged(nameof(FiveStarSoftPityStart)); } }
+            set => SetProtectedField(ref _fiveStarSoftPityStart, value, nameof(FiveStarSoftPityStart));
         }
 
         private int _fiveStarHardPity;
         public int FiveStarHardPity
         {
             get => _fiveStarHardPity;
-            set { if (_fiveStarHardPity != value) { _fiveStarHardPity = value; OnPropertyChanged(nameof(FiveStarHardPity)); } }
+            set => SetProtectedField(ref _fiveStarHardPity, value, nameof(FiveStarHardPity));
         }
 
         private double _fiveStarSoftPityStep;
         public double FiveStarSoftPityStep
         {
             get => _fiveStarSoftPityStep;
-            set { if (_fiveStarSoftPityStep != value) { _fiveStarSoftPityStep = value; OnPropertyChanged(nameof(FiveStarSoftPityStep)); } }
+            set => SetProtectedField(ref _fiveStarSoftPityStep, value, nameof(FiveStarSoftPityStep));
         }
 
         private double _fourStarBaseRate;
         public double FourStarBaseRate
         {
             get => _fourStarBaseRate;
-            set { if (_fourStarBaseRate != value) { _fourStarBaseRate = value; OnPropertyChanged(nameof(FourStarBaseRate)); } }
+            set => SetProtectedField(ref _fourStarBaseRate, value, nameof(FourStarBaseRate));
         }
 
         private int _fourStarSoftPityStart;
         public int FourStarSoftPityStart
         {
             get => _fourStarSoftPityStart;
-            set { if (_fourStarSoftPityStart != value) { _fourStarSoftPityStart = value; OnPropertyChanged(nameof(FourStarSoftPityStart)); } }
+            set => SetProtectedField(ref _fourStarSoftPityStart, value, nameof(FourStarSoftPityStart));
         }
 
         private int _fourStarHardPity;
         public int FourStarHardPity
         {
             get => _fourStarHardPity;
-            set { if (_fourStarHardPity != value) { _fourStarHardPity = value; OnPropertyChanged(nameof(FourStarHardPity)); } }
+            set => SetProtectedField(ref _fourStarHardPity, value, nameof(FourStarHardPity));
         }
 
         private double _fourStarSoftPityStep;
         public double FourStarSoftPityStep
         {
             get => _fourStarSoftPityStep;
-            set { if (_fourStarSoftPityStep != value) { _fourStarSoftPityStep = value; OnPropertyChanged(nameof(FourStarSoftPityStep)); } }
+            set => SetProtectedField(ref _fourStarSoftPityStep, value, nameof(FourStarSoftPityStep));
         }
 
         private double _fiveStarFeaturedRate;
         public double FiveStarFeaturedRate
         {
             get => _fiveStarFeaturedRate;
-            set { if (_fiveStarFeaturedRate != value) { _fiveStarFeaturedRate = value; OnPropertyChanged(nameof(FiveStarFeaturedRate)); } }
+            set => SetProtectedField(ref _fiveStarFeaturedRate, value, nameof(FiveStarFeaturedRate));
         }
 
         private double _fourStarFeaturedRate;
         public double FourStarFeaturedRate
         {
             get => _fourStarFeaturedRate;
-            set { if (_fourStarFeaturedRate != value) { _fourStarFeaturedRate = value; OnPropertyChanged(nameof(FourStarFeaturedRate)); } }
+            set => SetProtectedField(ref _fourStarFeaturedRate, value, nameof(FourStarFeaturedRate));
         }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string name) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    public class ProfileSetting : INotifyPropertyChanged
+    public class UsbAuthSetting : ProtectedSettingsObject
+    {
+        public UsbAuthSetting()
+        {
+            _enabled = false;
+            _authFileName = "IslandCaller.auth";
+            _publicKey = string.Empty;
+            _protectedPrivateKey = string.Empty;
+        }
+
+        private bool _enabled;
+        public bool Enabled
+        {
+            get => _enabled;
+            set => SetProtectedField(ref _enabled, value, nameof(Enabled));
+        }
+
+        private string _authFileName;
+        public string AuthFileName
+        {
+            get => _authFileName;
+            set => SetProtectedField(ref _authFileName, value, nameof(AuthFileName));
+        }
+
+        private string _publicKey;
+        public string PublicKey
+        {
+            get => _publicKey;
+            set => SetProtectedField(ref _publicKey, value, nameof(PublicKey));
+        }
+
+        private string _protectedPrivateKey;
+        public string ProtectedPrivateKey
+        {
+            get => _protectedPrivateKey;
+            set => SetProtectedField(ref _protectedPrivateKey, value, nameof(ProtectedPrivateKey));
+        }
+    }
+
+    public class ProfileSetting : ProtectedSettingsObject
     {
         public ProfileSetting()
         {
-            _profilenum = 1;
-            _defaultprofile = NewGuid();
-            _profilelist.Add(_defaultprofile, "Default");
-            _ispreferprofile = false;
+            _profileNum = 1;
+            _defaultProfile = NewGuid();
+            _profileList.Add(_defaultProfile, "Default");
+            _isPreferProfile = false;
         }
 
-        private int _profilenum;
+        private int _profileNum;
         public int ProfileNum
         {
-            get => _profilenum;
-            set { if (_profilenum != value) { _profilenum = value; OnPropertyChanged(nameof(ProfileNum)); } }
+            get => _profileNum;
+            set => SetProtectedField(ref _profileNum, value, nameof(ProfileNum));
         }
 
-        private Guid _defaultprofile;
+        private Guid _defaultProfile;
         public Guid DefaultProfile
         {
-            get => _defaultprofile;
-            set { if (_defaultprofile != value) { _defaultprofile = value; OnPropertyChanged(nameof(DefaultProfile)); } }
+            get => _defaultProfile;
+            set => SetProtectedField(ref _defaultProfile, value, nameof(DefaultProfile));
         }
 
-        private Dictionary<Guid, string> _profilelist = new Dictionary<Guid, string>();
+        private Dictionary<Guid, string> _profileList = new();
         public Dictionary<Guid, string> ProfileList
         {
-            get => _profilelist;
-            set { if (_profilelist != value) { _profilelist = value; OnPropertyChanged(nameof(ProfileList)); } }
+            get => _profileList;
+            set => SetProtectedField(ref _profileList, value, nameof(ProfileList));
         }
-        private Dictionary<Guid, string> _profileprefer = new Dictionary<Guid, string>();
 
-        private bool _ispreferprofile;
-        public bool IsPreferProfile
-        {
-            get => _ispreferprofile;
-            set { if (_ispreferprofile != value) { _ispreferprofile = value; OnPropertyChanged(nameof(IsPreferProfile)); } }
-        }
+        private Dictionary<Guid, string> _profilePrefer = new();
         public Dictionary<Guid, string> ProfilePrefer
         {
-            get => _profileprefer;
-            set { if (_profileprefer != value) { _profileprefer = value; OnPropertyChanged(nameof(ProfilePrefer)); } }
+            get => _profilePrefer;
+            set => SetProtectedField(ref _profilePrefer, value, nameof(ProfilePrefer));
         }
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string name) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private bool _isPreferProfile;
+        public bool IsPreferProfile
+        {
+            get => _isPreferProfile;
+            set => SetProtectedField(ref _isPreferProfile, value, nameof(IsPreferProfile));
+        }
     }
 
-    public class HoverSetting : INotifyPropertyChanged
+    public class HoverSetting : ProtectedSettingsObject
     {
         public HoverSetting()
         {
@@ -308,33 +364,24 @@ namespace IslandCaller.Models
         public bool IsEnable
         {
             get => _isEnable;
-            set { if (_isEnable != value) { _isEnable = value; OnPropertyChanged(nameof(IsEnable)); } }
+            set => SetProtectedField(ref _isEnable, value, nameof(IsEnable));
         }
 
         private double _scalingFactor;
-
         public double ScalingFactor
         {
             get => _scalingFactor;
             set
             {
                 var normalized = Math.Clamp(value, 0.5, 2.0);
-                if (_scalingFactor != normalized)
-                {
-                    _scalingFactor = normalized;
-                    OnPropertyChanged(nameof(ScalingFactor));
-                }
+                SetProtectedField(ref _scalingFactor, normalized, nameof(ScalingFactor));
             }
         }
 
-        public PositionSetting Position { get; set; } = new PositionSetting();
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string name) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        public PositionSetting Position { get; set; } = new();
     }
 
-    public class PositionSetting : INotifyPropertyChanged
+    public class PositionSetting : ProtectedSettingsObject
     {
         public PositionSetting()
         {
@@ -346,19 +393,14 @@ namespace IslandCaller.Models
         public double X
         {
             get => _x;
-            set { if (_x != value) { _x = value; OnPropertyChanged(nameof(X)); } }
+            set => SetProtectedField(ref _x, value, nameof(X));
         }
 
         private double _y;
         public double Y
         {
             get => _y;
-            set { if (_y != value) { _y = value; OnPropertyChanged(nameof(Y)); } }
+            set => SetProtectedField(ref _y, value, nameof(Y));
         }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string name) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
-
 }

@@ -26,6 +26,8 @@ namespace IslandCaller.Services
             this.status = status;
             Settings.Instance.General.PropertyChanged += OnSettingsChanged;
             Settings.Instance.Gacha.PropertyChanged += OnSettingsChanged;
+            Settings.Instance.UsbAuth.PropertyChanged += OnSettingsChanged;
+            usbAuthService.StatusChanged += (_, _) => ComputeWeightsForAllStudents();
         }
 
         internal enum DrawType
