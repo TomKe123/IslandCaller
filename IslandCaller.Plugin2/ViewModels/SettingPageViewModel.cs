@@ -728,7 +728,7 @@ namespace IslandCaller.ViewModels
             UpdateLotterySummary();
             UpdateProfileSummary();
             RefreshProtectedSettingsLockState();
-            _usbAuthService.StatusChanged += (_, snapshot) => Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyUsbAuthSnapshot(snapshot));
+            _usbAuthService.StatusChanged += (_, snapshot) => Avalonia.Threading.Dispatcher.UIThread.Post(() => OnUsbAuthStatusChanged(snapshot));
             _usbAuthService.DrivesChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => RefreshUsbAuthSection(refreshHistory: false));
             Settings.Instance.UsbAuth.PropertyChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => RefreshUsbAuthSection(refreshHistory: false));
 
@@ -1235,6 +1235,13 @@ namespace IslandCaller.ViewModels
             RefreshHistoryAndStatistics(_historyService);
         }
 
+        private void OnUsbAuthStatusChanged(UsbAuthSnapshot snapshot)
+        {
+            ApplyUsbAuthSnapshot(snapshot);
+            RefreshUsbAuthComputedState(snapshot);
+            UpdateGachaSummary(_historyService);
+        }
+
         private void ApplyUsbAuthSnapshot(UsbAuthSnapshot snapshot)
         {
             IsUsbAuthEnabled = Settings.Instance.UsbAuth.Enabled;
@@ -1242,13 +1249,13 @@ namespace IslandCaller.ViewModels
             UsbAuthStatusSummary = snapshot.Summary;
             UsbAuthStatusText = snapshot.Detail;
             UpdateUsbAuthGuide();
-            RefreshProtectedSettingsLockState();
+            RefreshProtectedSettingsLockState(snapshot);
         }
 
-        private void RefreshProtectedSettingsLockState()
+        private void RefreshProtectedSettingsLockState(UsbAuthSnapshot? snapshot = null)
         {
-            var snapshot = _usbAuthService.RefreshStatus();
-            bool locked = SettingsWriteGate.IsProtectionActive() && !snapshot.IsVerified;
+            var currentSnapshot = snapshot ?? _usbAuthService.RefreshStatus();
+            bool locked = SettingsWriteGate.IsProtectionActive() && !currentSnapshot.IsVerified;
             CanEditProtectedSettings = !locked;
             IsProtectedSettingsLocked = locked;
             ProtectedSettingsLockText = locked
@@ -1265,9 +1272,9 @@ namespace IslandCaller.ViewModels
         private void RefreshUsbAuthComputedState(UsbAuthSnapshot? snapshot = null)
         {
             var currentSnapshot = snapshot ?? _usbAuthService.RefreshStatus();
-            CanModifyUsbAuthConfiguration = _usbAuthProvisioningService.CanManageProvisioning();
+            CanModifyUsbAuthConfiguration = _usbAuthProvisioningService.CanManageProvisioning(currentSnapshot);
             CanWriteAuthorization = SelectedDrive != null && CanModifyUsbAuthConfiguration;
-            CanDisableProtection = Settings.Instance.UsbAuth.Enabled && currentSnapshot.IsVerified;
+            CanDisableProtection = !SettingsWriteGate.IsProtectionActive() || currentSnapshot.IsVerified;
             CanRegenerateKeyPair = CanModifyUsbAuthConfiguration;
             WriteButtonText = Settings.Instance.UsbAuth.Enabled ? "重写授权文件" : "写入授权并启用";
             SelectedDriveHint = SelectedDrive == null

@@ -54,12 +54,25 @@ public sealed class UsbAuthService
     public UsbAuthService(ILogger<UsbAuthService> logger)
     {
         _logger = logger;
+        try
+        {
+            RefreshState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "初始化U盘验证状态时发生异常");
+        }
+
         _ = Task.Run(MonitorAsync);
     }
 
     public UsbAuthSnapshot RefreshStatus(bool forceRefresh = false)
     {
-        RefreshState();
+        if (forceRefresh)
+        {
+            RefreshState();
+        }
+
         lock (_sync)
         {
             return _snapshot;
@@ -68,7 +81,11 @@ public sealed class UsbAuthService
 
     public IReadOnlyList<UsbDriveInfo> GetRemovableDrives(bool forceRefresh = false)
     {
-        RefreshState();
+        if (forceRefresh)
+        {
+            RefreshState();
+        }
+
         lock (_sync)
         {
             return _drives;

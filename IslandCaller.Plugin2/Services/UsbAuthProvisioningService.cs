@@ -28,9 +28,9 @@ public sealed class UsbAuthProvisioningService
         return UsbAuthService.GetPublicKeyFingerprint(Settings.Instance.UsbAuth.PublicKey);
     }
 
-    public bool CanManageProvisioning()
+    public bool CanManageProvisioning(UsbAuthSnapshot? snapshot = null)
     {
-        return !SettingsWriteGate.IsProtectionActive() || _usbAuthService.RefreshStatus().IsVerified;
+        return !SettingsWriteGate.IsProtectionActive() || (snapshot ?? _usbAuthService.RefreshStatus()).IsVerified;
     }
 
     public UsbAuthProvisioningResult WriteAuthorizationAndEnable(UsbDriveInfo drive)
@@ -75,8 +75,7 @@ public sealed class UsbAuthProvisioningService
                 envelopeBytes,
                 UsbAuthCrypto.FileEntropy);
 
-            string authFilePath = Path.Combine(drive.RootPath, authFileName);
-            File.WriteAllBytes(authFilePath, protectedBytes);
+            File.WriteAllBytes(drive.AuthFilePath, protectedBytes);
 
             using (SettingsWriteGate.Bypass())
             {
@@ -125,8 +124,12 @@ public sealed class UsbAuthProvisioningService
 
         try
         {
-            CreateAndPersistKeyPair();
-            Settings.Instance.UsbAuth.Enabled = false;
+            using (SettingsWriteGate.Bypass())
+            {
+                CreateAndPersistKeyPair();
+                Settings.Instance.UsbAuth.Enabled = false;
+            }
+
             var snapshot = _usbAuthService.RefreshStatus(forceRefresh: true);
             return new UsbAuthProvisioningResult(true, "已重置密钥对。请重新向目标U盘写入授权文件。", snapshot);
         }
