@@ -1,3 +1,6 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using IslandCaller.Models;
 using IslandCaller.Views;
@@ -265,11 +268,31 @@ public sealed class GlobalHotkeyService
         {
             _advancedTriggered = true;
             SuppressHotkey(_advancedHotkey);
-            Dispatcher.UIThread.Post(() => new PersonalCall().Show());
+            Dispatcher.UIThread.Post(ShowPersonalCallWindow);
             return true;
         }
 
         return false;
+    }
+
+    private void ShowPersonalCallWindow()
+    {
+        var existingWindow = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.Windows.OfType<PersonalCall>().FirstOrDefault()
+            : null;
+
+        if (existingWindow != null)
+        {
+            if (existingWindow.WindowState == WindowState.Minimized)
+            {
+                existingWindow.WindowState = WindowState.Normal;
+            }
+
+            existingWindow.Activate();
+            return;
+        }
+
+        new PersonalCall().Show();
     }
 
     private void ResetTriggerFlagsIfNeeded()

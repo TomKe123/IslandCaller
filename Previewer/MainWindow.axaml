@@ -46,21 +46,25 @@
             VerticalAlignment="Center"
             Grid.Row="0"
             Grid.Column="1"/>
-        <fa:SettingsExpander 
-        Grid.Row="1" 
-        Grid.Column="0" Grid.ColumnSpan="2"
-        Height="40"
-        Width="70"
-        IconSource="&#xECB6;"
-        Header="抽取人数"
-        Description="指定本次抽取的总人数">
-            <fa:SettingsExpander.Footer>
-                <fa:RangeSlider
-                Minimum="1"
-                Maximum="10"
-                StepFrequency="1"
-                ShowValueToolTip="True"/>
-            </fa:SettingsExpander.Footer>
-        </fa:SettingsExpander>
+        <Border Grid.Row="1"
+                Grid.Column="0"
+                Grid.ColumnSpan="2"
+                Margin="0,16,0,0"
+                Padding="14"
+                CornerRadius="10"
+                Background="#1AFFFFFF">
+            <StackPanel Spacing="8">
+                <TextBlock Text="抽取人数"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="指定本次抽取的总人数"
+                           Opacity="0.72"/>
+                <Slider Minimum="1"
+                        Maximum="10"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        Classes="auto-tooltip"
+                        Value="1"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

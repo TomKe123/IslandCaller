@@ -15,11 +15,14 @@
         ShowInTaskbar="False"
         Topmost="True"
         CanResize="False"
-        Height="300"
-        Width="520"
+        Height="430"
+        MinHeight="430"
+        Width="640"
+        MinWidth="640"
         WindowStartupLocation="CenterScreen">
   <Panel Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
-    <StackPanel Margin="24" Spacing="12">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="24" Spacing="12">
       <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4">
         <ci:FluentIcon Glyph="&#xED38;" FontSize="22" Grid.Column="0"/>
         <TextBlock Grid.Column="1"
@@ -34,23 +37,27 @@
         <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding AvailabilityText}"/>
       </Border>
 
-      <fa:SettingsExpander Header="抽取人数" Description="指定本次按顺序弹出的姓名数量">
-        <fa:SettingsExpander.Footer>
-          <TextBlock VerticalAlignment="Center" Text="{Binding Num, StringFormat={}{0:F0}}"/>
-        </fa:SettingsExpander.Footer>
-        <fa:SettingsExpanderItem>
-          <StackPanel Spacing="8">
-            <Slider Minimum="1"
-                    Maximum="10"
-                    TabIndex="1"
-                    IsSnapToTickEnabled="True"
-                    Classes="auto-tooltip"
-                    TickFrequency="1"
-                    Value="{Binding Num, Mode=TwoWay}"/>
-            <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding SelectionSummaryText}"/>
-          </StackPanel>
-        </fa:SettingsExpanderItem>
-      </fa:SettingsExpander>
+      <Border Padding="14" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock FontWeight="SemiBold" Text="抽取人数"/>
+              <TextBlock Opacity="0.72" Text="指定本次按顺序弹出的姓名数量"/>
+            </StackPanel>
+            <TextBlock Grid.Column="1"
+                       VerticalAlignment="Center"
+                       Text="{Binding Num, StringFormat={}{0:F0}}"/>
+          </Grid>
+          <Slider Minimum="1"
+                  Maximum="10"
+                  TabIndex="1"
+                  IsSnapToTickEnabled="True"
+                  Classes="auto-tooltip"
+                  TickFrequency="1"
+                  Value="{Binding Num, Mode=TwoWay}"/>
+          <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding SelectionSummaryText}"/>
+        </StackPanel>
+      </Border>
 
       <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,6,0,0">
         <Button Grid.Column="0" Click="CancelButton_Click">
@@ -70,6 +77,7 @@
           </Grid>
         </Button>
       </Grid>
-    </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
   </Panel>
 </Window>

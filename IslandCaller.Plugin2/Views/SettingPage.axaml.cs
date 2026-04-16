@@ -585,9 +585,9 @@ public partial class SettingPage : SettingsPageBase
                 ? vm.AdvancedCallHotkey
                 : vm.QuickCallHotkey;
 
-            if (AreHotkeysEquivalent(hotkeyText, otherHotkey))
+            if (AreHotkeysEquivalent(hotkeyText, otherHotkey) || AreHotkeysOverlapping(hotkeyText, otherHotkey))
             {
-                _bindingHintOverride = "绑定冲突：快速点名和高级点名不能使用同一个按键，请重新绑定。";
+                _bindingHintOverride = "绑定冲突：快速点名和高级点名不能使用重叠按键组合，请重新绑定。";
                 UpdateHotkeyBindingHint();
                 logger?.LogWarning("快捷键绑定冲突，Target={Target}, Hotkey={Hotkey}", target, hotkeyText);
                 return false;
@@ -689,46 +689,100 @@ public partial class SettingPage : SettingsPageBase
 
     private static bool AreHotkeysEquivalent(string left, string right)
     {
-        static string Normalize(string text)
+        return NormalizeHotkey(left) == NormalizeHotkey(right);
+    }
+
+    private static bool AreHotkeysOverlapping(string left, string right)
+    {
+        var leftInfo = ParseHotkeySignature(left);
+        var rightInfo = ParseHotkeySignature(right);
+        if (leftInfo == null || rightInfo == null)
         {
-            string CanonicalToken(string token)
-            {
-                return token.ToUpperInvariant() switch
-                {
-                    "CONTROL" => "CTRL",
-                    "WINDOWS" => "WIN",
-                    "ESCAPE" => "ESC",
-                    "RETURN" => "ENTER",
-                    "LBUTTON" => "MOUSELEFT",
-                    "RBUTTON" => "MOUSERIGHT",
-                    "MBUTTON" => "MOUSEMIDDLE",
-                    "鼠标左键" => "MOUSELEFT",
-                    "左键" => "MOUSELEFT",
-                    "鼠标右键" => "MOUSERIGHT",
-                    "右键" => "MOUSERIGHT",
-                    "鼠标中键" => "MOUSEMIDDLE",
-                    "中键" => "MOUSEMIDDLE",
-                    "XBUTTON1" => "MOUSEX1",
-                    "XBUTTON2" => "MOUSEX2",
-                    var t => t
-                };
-            }
-
-            var tokens = text
-                .Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(CanonicalToken)
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            string[] modifierOrder = ["CTRL", "SHIFT", "ALT", "WIN"];
-            var modifiers = modifierOrder.Where(tokens.Contains).ToList();
-            var mains = tokens.Where(t => !modifierOrder.Contains(t)).OrderBy(t => t, StringComparer.Ordinal).ToList();
-
-            return string.Join("+", modifiers.Concat(mains));
+            return false;
         }
 
-        return Normalize(left) == Normalize(right);
+        return leftInfo.Value.PrimarySet.Overlaps(rightInfo.Value.PrimarySet)
+            && leftInfo.Value.Modifiers.SetEquals(rightInfo.Value.Modifiers)
+            && (leftInfo.Value.PrimarySet.IsSubsetOf(rightInfo.Value.PrimarySet)
+                || rightInfo.Value.PrimarySet.IsSubsetOf(leftInfo.Value.PrimarySet));
     }
+
+    private static string NormalizeHotkey(string text)
+    {
+        var signature = ParseHotkeySignature(text);
+        if (signature == null)
+        {
+            return string.Empty;
+        }
+
+        string[] modifierOrder = ["CTRL", "SHIFT", "ALT", "WIN"];
+        var modifiers = modifierOrder.Where(signature.Value.Modifiers.Contains).ToList();
+        var mains = signature.Value.PrimarySet.OrderBy(t => t, StringComparer.Ordinal).ToList();
+        return string.Join("+", modifiers.Concat(mains));
+    }
+
+    private static HotkeySignature? ParseHotkeySignature(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        var modifiers = new HashSet<string>(StringComparer.Ordinal);
+        var primarySet = new HashSet<string>(StringComparer.Ordinal);
+
+        string CanonicalToken(string token)
+        {
+            return token.ToUpperInvariant() switch
+            {
+                "CONTROL" => "CTRL",
+                "WINDOWS" => "WIN",
+                "ESCAPE" => "ESC",
+                "RETURN" => "ENTER",
+                "LBUTTON" => "MOUSELEFT",
+                "RBUTTON" => "MOUSERIGHT",
+                "MBUTTON" => "MOUSEMIDDLE",
+                "鼠标左键" => "MOUSELEFT",
+                "左键" => "MOUSELEFT",
+                "鼠标右键" => "MOUSERIGHT",
+                "右键" => "MOUSERIGHT",
+                "鼠标中键" => "MOUSEMIDDLE",
+                "中键" => "MOUSEMIDDLE",
+                "XBUTTON1" => "MOUSEX1",
+                "XBUTTON2" => "MOUSEX2",
+                var t => t
+            };
+        }
+
+        foreach (var rawToken in text.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string token = CanonicalToken(rawToken);
+            switch (token)
+            {
+                case "CTRL":
+                case "SHIFT":
+                case "ALT":
+                case "WIN":
+                    modifiers.Add(token);
+                    break;
+                default:
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        primarySet.Add(token);
+                    }
+                    break;
+            }
+        }
+
+        if (primarySet.Count == 0)
+        {
+            return null;
+        }
+
+        return new HotkeySignature(modifiers, primarySet);
+    }
+
+    private readonly record struct HotkeySignature(HashSet<string> Modifiers, HashSet<string> PrimarySet);
 
     private void UpdateHotkeyBindingHint()
     {

@@ -1221,11 +1221,6 @@ namespace IslandCaller.ViewModels
             RefreshUsbAuthComputedState(snapshot);
             UsbAuthActionMessage = string.IsNullOrWhiteSpace(UsbAuthActionMessage) ? snapshot.Detail : UsbAuthActionMessage;
 
-            if (IsGachaEnabled && Settings.Instance.UsbAuth.Enabled && !snapshot.IsVerified)
-            {
-                IsGachaEnabled = false;
-            }
-
             if (!refreshHistory)
             {
                 return;

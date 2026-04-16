@@ -15,7 +15,7 @@
         ShowInTaskbar="False"
         Topmost="True"
         CanResize="False"
-        Height="420"
+        Height="360"
         Width="560"
         WindowStartupLocation="CenterScreen">
   <Panel Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
@@ -29,10 +29,6 @@
                    FontSize="18"
                    Text="IslandCaller 抽奖"/>
       </Grid>
-
-      <Border Padding="12" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
-        <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding AvailabilityText}"/>
-      </Border>
 
       <fa:SettingsExpander Header="奖项" Description="选择预设奖项或直接修改奖项名称">
         <fa:SettingsExpanderItem>
@@ -50,22 +46,20 @@
         </fa:SettingsExpanderItem>
       </fa:SettingsExpander>
 
-      <fa:SettingsExpander Header="人数" Description="设置本次抽奖人数">
-        <fa:SettingsExpander.Footer>
-          <TextBlock VerticalAlignment="Center" Text="{Binding WinnerCount}"/>
-        </fa:SettingsExpander.Footer>
-        <fa:SettingsExpanderItem>
-          <StackPanel Spacing="8">
-            <Slider Minimum="1"
-                    Maximum="{Binding WinnerCountMaximum}"
-                    TickFrequency="1"
-                    IsSnapToTickEnabled="True"
-                    Classes="auto-tooltip"
-                    Value="{Binding WinnerCount, Mode=TwoWay}"/>
-            <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding SelectionSummaryText}"/>
-          </StackPanel>
-        </fa:SettingsExpanderItem>
-      </fa:SettingsExpander>
+      <Border Padding="14" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="抽取人数"/>
+            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding WinnerCount}"/>
+          </Grid>
+          <Slider Minimum="1"
+                  Maximum="20"
+                  TickFrequency="1"
+                  IsSnapToTickEnabled="True"
+                  Classes="auto-tooltip"
+                  Value="{Binding WinnerCount, Mode=TwoWay}"/>
+        </StackPanel>
+      </Border>
 
       <TextBlock Text="抽奖结果" FontWeight="SemiBold"/>
       <Border Padding="12" MinHeight="84" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
@@ -79,10 +73,7 @@
             <TextBlock Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Center" Text="关闭"/>
           </Grid>
         </Button>
-        <Button Grid.Column="1"
-                Classes="accent"
-                IsEnabled="{Binding CanDraw}"
-                Click="DrawButton_Click">
+        <Button Grid.Column="1" Classes="accent" Click="DrawButton_Click">
           <Grid ColumnDefinitions="Auto,Auto">
             <ci:FluentIcon Glyph="&#xE7C5;" Grid.Column="0" VerticalAlignment="Center"/>
             <TextBlock Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Center" Text="开始抽奖"/>
