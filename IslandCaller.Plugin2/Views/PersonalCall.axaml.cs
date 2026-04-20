@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using ClassIsland.Shared;
+using IslandCaller.Models;
 using IslandCaller.Services;
 using IslandCaller.Services.IslandCallerService;
 using System.ComponentModel;
@@ -10,10 +11,29 @@ namespace IslandCaller.Views;
 
 public partial class PersonalCall : Window, INotifyPropertyChanged
 {
+    public sealed record ScopeOption(LessonDrawScopeOption Value, string Label);
+    public sealed record AlgorithmOption(LessonDrawAlgorithmOption Value, string Label);
+
     private readonly IslandCallerService _islandCallerService;
     private readonly Status _status;
     private readonly CoreService _coreService;
+    private readonly LessonDrawSettingsService _lessonDrawSettingsService;
     private const int OwnerGapPx = 12;
+
+    public IReadOnlyList<ScopeOption> ScopeOptions { get; } =
+    [
+        new(LessonDrawScopeOption.FollowMain, "跟随主设置"),
+        new(LessonDrawScopeOption.All, "全班"),
+        new(LessonDrawScopeOption.Male, "仅男生"),
+        new(LessonDrawScopeOption.Female, "仅女生")
+    ];
+
+    public IReadOnlyList<AlgorithmOption> AlgorithmOptions { get; } =
+    [
+        new(LessonDrawAlgorithmOption.FollowMain, "跟随主设置"),
+        new(LessonDrawAlgorithmOption.Balanced, "平衡抽选"),
+        new(LessonDrawAlgorithmOption.PureRandom, "完全公平" )
+    ];
 
     private double _num = 1;
     public double Num
@@ -30,6 +50,46 @@ public partial class PersonalCall : Window, INotifyPropertyChanged
             _num = normalized;
             RaisePropertyChanged(nameof(Num));
             RaisePropertyChanged(nameof(SelectionSummaryText));
+        }
+    }
+
+    private ScopeOption? _selectedLessonScopeOption;
+    public ScopeOption? SelectedLessonScopeOption
+    {
+        get => _selectedLessonScopeOption;
+        set
+        {
+            if (_selectedLessonScopeOption == value || value == null)
+            {
+                return;
+            }
+
+            _selectedLessonScopeOption = value;
+            ApplyLessonQuickSettings();
+            RaisePropertyChanged(nameof(SelectedLessonScopeOption));
+            RaisePropertyChanged(nameof(EffectiveScopeText));
+            RaisePropertyChanged(nameof(QuickSettingsSummaryText));
+            RefreshAvailability();
+        }
+    }
+
+    private AlgorithmOption? _selectedLessonAlgorithmOption;
+    public AlgorithmOption? SelectedLessonAlgorithmOption
+    {
+        get => _selectedLessonAlgorithmOption;
+        set
+        {
+            if (_selectedLessonAlgorithmOption == value || value == null)
+            {
+                return;
+            }
+
+            _selectedLessonAlgorithmOption = value;
+            ApplyLessonQuickSettings();
+            RaisePropertyChanged(nameof(SelectedLessonAlgorithmOption));
+            RaisePropertyChanged(nameof(EffectiveAlgorithmText));
+            RaisePropertyChanged(nameof(QuickSettingsSummaryText));
+            RefreshAvailability();
         }
     }
 
@@ -66,8 +126,15 @@ public partial class PersonalCall : Window, INotifyPropertyChanged
         }
     }
 
+    public string EffectiveScopeText => ResolveScopeLabel(_lessonDrawSettingsService.EffectiveScope);
+    public string EffectiveAlgorithmText => ResolveAlgorithmLabel(_lessonDrawSettingsService.EffectiveAlgorithm);
+
+    public string QuickSettingsSummaryText => _lessonDrawSettingsService.HasLessonOverride
+        ? $"当前已对本节课临时生效：{EffectiveScopeText} / {EffectiveAlgorithmText}。到下一节课会自动恢复主设置。"
+        : $"当前跟随主设置：{EffectiveScopeText} / {EffectiveAlgorithmText}。";
+
     public string SelectionSummaryText => CanStartCall
-        ? $"将按顺序点名 {(int)Num} 人；连续抽取时可能出现重复。"
+        ? $"将按顺序点名 {(int)Num} 人；当前模式：{EffectiveScopeText} / {EffectiveAlgorithmText}。连续抽取时可能出现重复。"
         : AvailabilityText;
 
     public PersonalCall()
@@ -75,10 +142,13 @@ public partial class PersonalCall : Window, INotifyPropertyChanged
         _islandCallerService = IAppHost.GetService<IslandCallerService>();
         _status = IAppHost.GetService<Status>();
         _coreService = IAppHost.GetService<CoreService>();
+        _lessonDrawSettingsService = IAppHost.GetService<LessonDrawSettingsService>();
 
         InitializeComponent();
         DataContext = this;
 
+        SelectedLessonScopeOption = ScopeOptions.First(x => x.Value == _lessonDrawSettingsService.GetLessonScopeOption());
+        SelectedLessonAlgorithmOption = AlgorithmOptions.First(x => x.Value == _lessonDrawSettingsService.GetLessonAlgorithmOption());
         RefreshAvailability();
         _status.PropertyChanged += StatusOnPropertyChanged;
     }
@@ -113,11 +183,20 @@ public partial class PersonalCall : Window, INotifyPropertyChanged
         }
     }
 
+    private void ApplyLessonQuickSettings()
+    {
+        _lessonDrawSettingsService.ApplyLessonOverride(
+            SelectedLessonScopeOption?.Value ?? LessonDrawScopeOption.FollowMain,
+            SelectedLessonAlgorithmOption?.Value ?? LessonDrawAlgorithmOption.FollowMain);
+    }
+
     private void RefreshAvailability()
     {
         string? blockedReason = GetBlockedReason();
         CanStartCall = string.IsNullOrWhiteSpace(blockedReason);
         AvailabilityText = blockedReason ?? $"当前可用成员 {GetAvailableMemberCount()} 人。";
+        RaisePropertyChanged(nameof(QuickSettingsSummaryText));
+        RaisePropertyChanged(nameof(SelectionSummaryText));
     }
 
     private string? GetBlockedReason()
@@ -125,7 +204,7 @@ public partial class PersonalCall : Window, INotifyPropertyChanged
         int memberCount = GetAvailableMemberCount();
         if (memberCount <= 0)
         {
-            return "当前名单为空，请先添加成员或导入名单。";
+            return "当前筛选结果为空，请调整快速设置或补充名单。";
         }
 
         if (!_status.ProfileServiceInitialized || !_status.HistoryServiceInitialized || !_status.CoreServiceInitialized || !_status.IslandCallerServiceInitialized)
@@ -148,7 +227,32 @@ public partial class PersonalCall : Window, INotifyPropertyChanged
 
     private int GetAvailableMemberCount()
     {
-        return _coreService.StudentNames.Count(name => !string.IsNullOrWhiteSpace(name));
+        var names = _coreService.StudentNames.Where(name => !string.IsNullOrWhiteSpace(name));
+        return _lessonDrawSettingsService.EffectiveScope switch
+        {
+            DrawSelectionScope.Male => _coreService.StudentEntries.Count(p => !string.IsNullOrWhiteSpace(p.Name) && p.Gender == 0),
+            DrawSelectionScope.Female => _coreService.StudentEntries.Count(p => !string.IsNullOrWhiteSpace(p.Name) && p.Gender == 1),
+            _ => names.Count()
+        };
+    }
+
+    private static string ResolveScopeLabel(DrawSelectionScope scope)
+    {
+        return scope switch
+        {
+            DrawSelectionScope.Male => "仅男生",
+            DrawSelectionScope.Female => "仅女生",
+            _ => "全班"
+        };
+    }
+
+    private static string ResolveAlgorithmLabel(DrawSelectionAlgorithm algorithm)
+    {
+        return algorithm switch
+        {
+            DrawSelectionAlgorithm.PureRandom => "完全公平",
+            _ => "平衡抽选"
+        };
     }
 
     private void CancelButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

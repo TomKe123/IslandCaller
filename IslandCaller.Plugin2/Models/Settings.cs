@@ -167,6 +167,8 @@ namespace IslandCaller.Models
             IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
             IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
             IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
+            IsC_GeneralKey?.SetValue("DefaultDrawScope", (int)Instance.General.DefaultDrawScope);
+            IsC_GeneralKey?.SetValue("DefaultDrawAlgorithm", (int)Instance.General.DefaultDrawAlgorithm);
             SaveGachaSettings(IsC_GachaKey);
             SaveUsbAuthSettings(IsC_UsbAuthKey);
             IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
@@ -236,6 +238,22 @@ namespace IslandCaller.Models
             Instance.UsbAuth.ProtectedPrivateKey = (usbAuthKey?.GetValue("ProtectedPrivateKey") as string) ?? string.Empty;
             Instance.UsbAuth.Enabled = !string.IsNullOrWhiteSpace(publicKey)
                 && Convert.ToBoolean(usbAuthKey?.GetValue("Enabled") ?? legacyEnabled);
+        }
+
+        private static DrawSelectionScope ParseDrawScope(object? rawValue, DrawSelectionScope fallback)
+        {
+            int value = Convert.ToInt32(rawValue ?? (int)fallback);
+            return Enum.IsDefined(typeof(DrawSelectionScope), value)
+                ? (DrawSelectionScope)value
+                : fallback;
+        }
+
+        private static DrawSelectionAlgorithm ParseDrawAlgorithm(object? rawValue, DrawSelectionAlgorithm fallback)
+        {
+            int value = Convert.ToInt32(rawValue ?? (int)fallback);
+            return Enum.IsDefined(typeof(DrawSelectionAlgorithm), value)
+                ? (DrawSelectionAlgorithm)value
+                : fallback;
         }
     }
     public static class SettingsBinder

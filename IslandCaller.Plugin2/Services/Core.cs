@@ -11,17 +11,19 @@ namespace IslandCaller.Services
         private readonly ProfileService profileService;
         private readonly HistoryService historyService;
         private readonly UsbAuthService usbAuthService;
+        private readonly LessonDrawSettingsService lessonDrawSettingsService;
         private readonly ILogger<CoreService> logger;
         private readonly Status status;
         private const double CapturedRadianceChanceOnFeaturedMiss = 0.1;
         private bool settingsCacheDirty = true;
         private GachaSettingsSnapshot gachaSettingsSnapshot = GachaSettingsSnapshot.Empty;
 
-        public CoreService(ProfileService profileService, HistoryService historyService, UsbAuthService usbAuthService, ILogger<CoreService> logger, Status status)
+        public CoreService(ProfileService profileService, HistoryService historyService, UsbAuthService usbAuthService, LessonDrawSettingsService lessonDrawSettingsService, ILogger<CoreService> logger, Status status)
         {
             this.profileService = profileService;
             this.historyService = historyService;
             this.usbAuthService = usbAuthService;
+            this.lessonDrawSettingsService = lessonDrawSettingsService;
             this.logger = logger;
             this.status = status;
             Settings.Instance.General.PropertyChanged += OnSettingsChanged;
@@ -58,6 +60,7 @@ namespace IslandCaller.Services
         internal List<Person> Persons { get; } = [];
 
         public IEnumerable<string> StudentNames => Persons.Select(p => p.Name);
+        public IEnumerable<(string Name, int Gender)> StudentEntries => Persons.Select(p => (p.Name, p.Gender));
 
         internal void InitializeCore()
         {
@@ -140,27 +143,24 @@ namespace IslandCaller.Services
 
         private DrawResult GetClassicRandomStudentResult()
         {
-            double totalWeight = Persons.Sum(p => p.Weight);
-            if (totalWeight <= 0)
+            var candidates = GetEffectiveClassicCandidates();
+            if (candidates.Count == 0)
             {
                 return new DrawResult("Error", DrawType.Normal);
             }
 
-            double r = GetTrueRandomDouble() * totalWeight;
-            double cumulative = 0;
-            foreach (var person in Persons)
+            Person? selected = lessonDrawSettingsService.EffectiveAlgorithm == DrawSelectionAlgorithm.PureRandom
+                ? PickPureRandomPerson(candidates)
+                : PickClassicWeightedPerson(candidates);
+            if (selected == null)
             {
-                cumulative += person.Weight;
-                if (r < cumulative)
-                {
-                    historyService.Add(person.Name);
-                    ComputeWeightsForAllStudents();
-                    return new DrawResult(person.Name, DrawType.Normal);
-                }
+                logger.LogWarning("Classic draw failed to resolve a student");
+                return new DrawResult("Error", DrawType.Normal);
             }
 
-            logger.LogWarning("Classic draw failed to resolve a student");
-            return new DrawResult("Error", DrawType.Normal);
+            historyService.Add(selected.Name);
+            ComputeWeightsForAllStudents();
+            return new DrawResult(selected.Name, DrawType.Normal);
         }
 
         private DrawResult GetRandomCharacterPoolResult()
@@ -318,6 +318,62 @@ namespace IslandCaller.Services
             pityState.FeaturedFiveStarName = PickDailyFeaturedName(fiveStarCandidates);
             pityState.FeaturedFourStarNames = PickDailyFeaturedNames(fourStarCandidates, 3);
             historyService.UpdateGachaPityState(pityState);
+        }
+
+        private IReadOnlyList<Person> GetEffectiveClassicCandidates()
+        {
+            var namedPersons = Persons
+                .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                .ToList();
+            if (namedPersons.Count == 0)
+            {
+                return [];
+            }
+
+            return lessonDrawSettingsService.EffectiveScope switch
+            {
+                DrawSelectionScope.Male => namedPersons.Where(p => p.Gender == 0).ToList(),
+                DrawSelectionScope.Female => namedPersons.Where(p => p.Gender == 1).ToList(),
+                _ => namedPersons
+            };
+        }
+
+        private static Person? PickPureRandomPerson(IReadOnlyList<Person> persons)
+        {
+            if (persons.Count == 0)
+            {
+                return null;
+            }
+
+            int index = RandomNumberGenerator.GetInt32(persons.Count);
+            return persons[index];
+        }
+
+        private static Person? PickClassicWeightedPerson(IReadOnlyList<Person> persons)
+        {
+            if (persons.Count == 0)
+            {
+                return null;
+            }
+
+            double totalWeight = persons.Sum(x => Math.Max(0.01, x.Weight));
+            if (totalWeight <= 0)
+            {
+                return persons.OrderBy(x => x.Id).FirstOrDefault();
+            }
+
+            double r = GetTrueRandomDouble() * totalWeight;
+            double cumulative = 0;
+            foreach (var person in persons)
+            {
+                cumulative += Math.Max(0.01, person.Weight);
+                if (r < cumulative)
+                {
+                    return person;
+                }
+            }
+
+            return persons.OrderBy(x => x.Id).FirstOrDefault();
         }
 
         private Person? PickWeightedPerson(IReadOnlyList<Person> persons)

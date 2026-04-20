@@ -35,6 +35,7 @@ namespace IslandCaller
             services.AddSingleton<HistoryService>();
             services.AddSingleton<CoreService>();
             services.AddSingleton<GlobalHotkeyService>();
+            services.AddSingleton<LessonDrawSettingsService>();
             services.AddSingleton<UsbAuthService>();
             services.AddSingleton<UsbAuthProvisioningService>();
             services.AddSingleton<WindowDragHelper>();

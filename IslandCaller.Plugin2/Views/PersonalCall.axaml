@@ -15,10 +15,10 @@
         ShowInTaskbar="False"
         Topmost="True"
         CanResize="False"
-        Height="430"
-        MinHeight="430"
-        Width="640"
-        MinWidth="640"
+        Height="560"
+        MinHeight="560"
+        Width="700"
+        MinWidth="700"
         WindowStartupLocation="CenterScreen">
   <Panel Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -35,6 +35,30 @@
 
       <Border Padding="12" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
         <TextBlock Opacity="0.78" TextWrapping="Wrap" Text="{Binding AvailabilityText}"/>
+      </Border>
+
+      <Border Padding="14" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+        <StackPanel Spacing="10">
+          <TextBlock FontWeight="SemiBold" Text="本节课快速设置"/>
+          <TextBlock Opacity="0.72" TextWrapping="Wrap" Text="{Binding QuickSettingsSummaryText}"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="抽选范围"/>
+            <ComboBox Grid.Row="0"
+                      Grid.Column="1"
+                      ItemsSource="{Binding ScopeOptions}"
+                      DisplayMemberBinding="{Binding Label}"
+                      SelectedItem="{Binding SelectedLessonScopeOption, Mode=TwoWay}"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="抽选算法"/>
+            <ComboBox Grid.Row="1"
+                      Grid.Column="1"
+                      ItemsSource="{Binding AlgorithmOptions}"
+                      DisplayMemberBinding="{Binding Label}"
+                      SelectedItem="{Binding SelectedLessonAlgorithmOption, Mode=TwoWay}"/>
+          </Grid>
+          <TextBlock Opacity="0.68"
+                     TextWrapping="Wrap"
+                     Text="男生/女生/完全公平等快速设置仅对当前这节课生效；进入下一节课后会自动恢复主设置页面中的默认模式。"/>
+        </StackPanel>
       </Border>
 
       <Border Padding="14" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">

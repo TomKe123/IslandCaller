@@ -7,6 +7,7 @@ using ReactiveUI;
 using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Input;
@@ -72,6 +73,70 @@ namespace IslandCaller.ViewModels
         {
             get => _pacerThreshold;
             set => this.RaiseAndSetIfChanged(ref _pacerThreshold, value);
+        }
+
+        private DrawSelectionScope _defaultDrawScope;
+        public DrawSelectionScope DefaultDrawScope
+        {
+            get => _defaultDrawScope;
+            set => this.RaiseAndSetIfChanged(ref _defaultDrawScope, value);
+        }
+
+        private DrawSelectionAlgorithm _defaultDrawAlgorithm;
+        public DrawSelectionAlgorithm DefaultDrawAlgorithm
+        {
+            get => _defaultDrawAlgorithm;
+            set => this.RaiseAndSetIfChanged(ref _defaultDrawAlgorithm, value);
+        }
+
+        private DrawScopeOptionItem? _selectedDrawScopeOption;
+        public DrawScopeOptionItem? SelectedDrawScopeOption
+        {
+            get => _selectedDrawScopeOption;
+            set
+            {
+                if (_selectedDrawScopeOption == value)
+                {
+                    return;
+                }
+
+                this.RaiseAndSetIfChanged(ref _selectedDrawScopeOption, value);
+                if (value != null)
+                {
+                    DefaultDrawScope = value.Value;
+                }
+            }
+        }
+
+        private DrawAlgorithmOptionItem? _selectedDrawAlgorithmOption;
+        public DrawAlgorithmOptionItem? SelectedDrawAlgorithmOption
+        {
+            get => _selectedDrawAlgorithmOption;
+            set
+            {
+                if (_selectedDrawAlgorithmOption == value)
+                {
+                    return;
+                }
+
+                this.RaiseAndSetIfChanged(ref _selectedDrawAlgorithmOption, value);
+                if (value != null)
+                {
+                    DefaultDrawAlgorithm = value.Value;
+                }
+            }
+        }
+
+        public sealed class DrawScopeOptionItem
+        {
+            public DrawSelectionScope Value { get; init; }
+            public string Label { get; init; } = string.Empty;
+        }
+
+        public sealed class DrawAlgorithmOptionItem
+        {
+            public DrawSelectionAlgorithm Value { get; init; }
+            public string Label { get; init; } = string.Empty;
         }
 
         private bool _isGachaEnabled;
@@ -661,6 +726,19 @@ namespace IslandCaller.ViewModels
         }
 
         public IReadOnlyList<int> RarityOptions { get; } = [3, 5];
+        public IReadOnlyList<DrawScopeOptionItem> DrawScopeOptions { get; } =
+        [
+            new() { Value = DrawSelectionScope.All, Label = "完全班级" },
+            new() { Value = DrawSelectionScope.Male, Label = "仅男生" },
+            new() { Value = DrawSelectionScope.Female, Label = "仅女生" }
+        ];
+
+        public IReadOnlyList<DrawAlgorithmOptionItem> DrawAlgorithmOptions { get; } =
+        [
+            new() { Value = DrawSelectionAlgorithm.Balanced, Label = "平衡抽选" },
+            new() { Value = DrawSelectionAlgorithm.PureRandom, Label = "完全公平" }
+        ];
+
         public ICommand RowCommand => new RelayCommand<StudentModel>(row =>
         {
             if (row == null) return;
@@ -692,6 +770,10 @@ namespace IslandCaller.ViewModels
             IsGuaranteeEnabled = Settings.Instance.General.EnableGuarantee;
             GuaranteeThreshold = Settings.Instance.General.GuaranteeThreshold;
             PacerThreshold = Settings.Instance.General.PacerThreshold;
+            DefaultDrawScope = Settings.Instance.General.DefaultDrawScope;
+            DefaultDrawAlgorithm = Settings.Instance.General.DefaultDrawAlgorithm;
+            SelectedDrawScopeOption = DrawScopeOptions.FirstOrDefault(x => x.Value == DefaultDrawScope);
+            SelectedDrawAlgorithmOption = DrawAlgorithmOptions.FirstOrDefault(x => x.Value == DefaultDrawAlgorithm);
             IsGachaEnabled = Settings.Instance.Gacha.Enabled;
             IsUsbAuthEnabled = Settings.Instance.UsbAuth.Enabled;
             LoadAuthFileNameFromSettings();
@@ -775,6 +857,24 @@ namespace IslandCaller.ViewModels
                     }
 
                     RefreshPacerList(_profileService);
+                    RefreshHistoryAndStatistics(_historyService);
+                }
+                else if (args.PropertyName == nameof(DefaultDrawScope))
+                {
+                    Settings.Instance.General.DefaultDrawScope = DefaultDrawScope;
+                    if (SelectedDrawScopeOption?.Value != DefaultDrawScope)
+                    {
+                        SelectedDrawScopeOption = DrawScopeOptions.FirstOrDefault(x => x.Value == DefaultDrawScope);
+                    }
+                    RefreshHistoryAndStatistics(_historyService);
+                }
+                else if (args.PropertyName == nameof(DefaultDrawAlgorithm))
+                {
+                    Settings.Instance.General.DefaultDrawAlgorithm = DefaultDrawAlgorithm;
+                    if (SelectedDrawAlgorithmOption?.Value != DefaultDrawAlgorithm)
+                    {
+                        SelectedDrawAlgorithmOption = DrawAlgorithmOptions.FirstOrDefault(x => x.Value == DefaultDrawAlgorithm);
+                    }
                     RefreshHistoryAndStatistics(_historyService);
                 }
                 else if (args.PropertyName == nameof(IsGachaEnabled))

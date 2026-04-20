@@ -109,6 +109,30 @@
                 </fa:SettingsExpander.Footer>
             </fa:SettingsExpander>
 
+            <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE8D4;}" Header="默认抽选模式" Description="设置全局默认的抽选范围和算法">
+                <fa:SettingsExpanderItem>
+                    <StackPanel Spacing="10" IsEnabled="{Binding CanEditProtectedSettings}">
+                        <TextBlock Opacity="0.78"
+                                   TextWrapping="Wrap"
+                                   Text="自定义点名窗口可临时覆盖本节课模式；到下一节课会自动恢复到这里的默认设置。"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="默认范围"/>
+                            <ComboBox Grid.Row="0"
+                                      Grid.Column="1"
+                                      ItemsSource="{Binding DrawScopeOptions}"
+                                      DisplayMemberBinding="{Binding Label}"
+                                      SelectedItem="{Binding SelectedDrawScopeOption, Mode=TwoWay}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="默认算法"/>
+                            <ComboBox Grid.Row="1"
+                                      Grid.Column="1"
+                                      ItemsSource="{Binding DrawAlgorithmOptions}"
+                                      DisplayMemberBinding="{Binding Label}"
+                                      SelectedItem="{Binding SelectedDrawAlgorithmOption, Mode=TwoWay}"/>
+                        </Grid>
+                    </StackPanel>
+                </fa:SettingsExpanderItem>
+            </fa:SettingsExpander>
+
             <fa:SettingsExpander IconSource="{ci:FluentIconSource &#xE765;}" Header="全局快捷键" Description="设置快速操作快捷键">
                 <fa:SettingsExpander.Footer>
                     <ToggleSwitch IsChecked="{Binding IsGlobalHotkeyEnabled, Mode=TwoWay}"
