@@ -47,7 +47,6 @@ public sealed class GlobalHotkeyService
     private readonly global::IslandCaller.Services.IslandCallerService.IslandCallerService _islandCallerService;
     private readonly ILogger<GlobalHotkeyService> _logger;
     private readonly HashSet<int> _pressedKeys = [];
-    private readonly HashSet<int> _suppressedKeys = [];
 
     private nint _keyboardHookHandle;
     private nint _mouseHookHandle;
@@ -176,21 +175,15 @@ public sealed class GlobalHotkeyService
             if (message == WmKeyDown || message == WmSysKeyDown)
             {
                 _pressedKeys.Add(vkCode);
-                if (_suppressedKeys.Contains(vkCode) || TryTriggerHotkeys())
+                if (TryTriggerHotkeys())
                 {
                     return 1;
                 }
             }
             else if (message == WmKeyUp || message == WmSysKeyUp)
             {
-                bool shouldSuppress = _suppressedKeys.Contains(vkCode);
                 _pressedKeys.Remove(vkCode);
-                _suppressedKeys.Remove(vkCode);
                 ResetTriggerFlagsIfNeeded();
-                if (shouldSuppress)
-                {
-                    return 1;
-                }
             }
         }
 
@@ -211,21 +204,15 @@ public sealed class GlobalHotkeyService
                 if (message is WmLButtonDown or WmRButtonDown or WmMButtonDown or WmXButtonDown)
                 {
                     _pressedKeys.Add(mouseVkCode);
-                    if (_suppressedKeys.Contains(mouseVkCode) || TryTriggerHotkeys())
+                    if (TryTriggerHotkeys())
                     {
                         return 1;
                     }
                 }
                 else if (message is WmLButtonUp or WmRButtonUp or WmMButtonUp or WmXButtonUp)
                 {
-                    bool shouldSuppress = _suppressedKeys.Contains(mouseVkCode);
                     _pressedKeys.Remove(mouseVkCode);
-                    _suppressedKeys.Remove(mouseVkCode);
                     ResetTriggerFlagsIfNeeded();
-                    if (shouldSuppress)
-                    {
-                        return 1;
-                    }
                 }
             }
         }
@@ -262,7 +249,6 @@ public sealed class GlobalHotkeyService
         if (!_quickTriggered && IsHotkeyPressed(_quickHotkey))
         {
             _quickTriggered = true;
-            SuppressHotkey(_quickHotkey);
             Dispatcher.UIThread.Post(() => _islandCallerService.ShowRandomStudent(1));
             return true;
         }
@@ -270,7 +256,6 @@ public sealed class GlobalHotkeyService
         if (!_advancedTriggered && IsHotkeyPressed(_advancedHotkey))
         {
             _advancedTriggered = true;
-            SuppressHotkey(_advancedHotkey);
             Dispatcher.UIThread.Post(ShowPersonalCallWindow);
             return true;
         }
@@ -360,7 +345,6 @@ public sealed class GlobalHotkeyService
             if (!IsKeyCurrentlyDown(trackedKey))
             {
                 _pressedKeys.Remove(trackedKey);
-                _suppressedKeys.Remove(trackedKey);
             }
         }
 
@@ -371,55 +355,6 @@ public sealed class GlobalHotkeyService
     {
         short state = GetAsyncKeyState(vkCode);
         return (state & 0x8000) != 0;
-    }
-
-    private void SuppressHotkey(HotkeyDefinition hotkey)
-    {
-        if (hotkey.PrimaryKeyCode != 0)
-        {
-            _suppressedKeys.Add(hotkey.PrimaryKeyCode);
-        }
-
-        if (hotkey.SecondaryKeyCode != 0)
-        {
-            _suppressedKeys.Add(hotkey.SecondaryKeyCode);
-        }
-
-        AddModifierKeysForSuppression(hotkey);
-    }
-
-    private void AddModifierKeysForSuppression(HotkeyDefinition hotkey)
-    {
-        if (hotkey.Ctrl)
-        {
-            AddPressedModifierKeys(VkControl, VkLControl, VkRControl);
-        }
-
-        if (hotkey.Shift)
-        {
-            AddPressedModifierKeys(VkShift, VkLShift, VkRShift);
-        }
-
-        if (hotkey.Alt)
-        {
-            AddPressedModifierKeys(VkMenu, VkLMenu, VkRMenu);
-        }
-
-        if (hotkey.Win)
-        {
-            AddPressedModifierKeys(VkLWin, VkRWin);
-        }
-    }
-
-    private void AddPressedModifierKeys(params int[] keyCodes)
-    {
-        foreach (int keyCode in keyCodes)
-        {
-            if (_pressedKeys.Contains(keyCode))
-            {
-                _suppressedKeys.Add(keyCode);
-            }
-        }
     }
 
     private static bool TryParseHotkey(string? text, out HotkeyDefinition hotkey)
