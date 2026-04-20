@@ -171,6 +171,7 @@ public sealed class GlobalHotkeyService
         {
             var message = unchecked((int)wParam);
             var vkCode = Marshal.ReadInt32(lParam);
+            PruneReleasedKeys(vkCode);
 
             if (message == WmKeyDown || message == WmSysKeyDown)
             {
@@ -344,6 +345,31 @@ public sealed class GlobalHotkeyService
 
     private bool IsWinPressed() =>
         _pressedKeys.Contains(VkLWin) || _pressedKeys.Contains(VkRWin);
+
+    private void PruneReleasedKeys(int currentVkCode)
+    {
+        foreach (int trackedKey in _pressedKeys.ToArray())
+        {
+            if (trackedKey == currentVkCode)
+            {
+                continue;
+            }
+
+            if (!IsKeyCurrentlyDown(trackedKey))
+            {
+                _pressedKeys.Remove(trackedKey);
+                _suppressedKeys.Remove(trackedKey);
+            }
+        }
+
+        ResetTriggerFlagsIfNeeded();
+    }
+
+    private static bool IsKeyCurrentlyDown(int vkCode)
+    {
+        short state = GetAsyncKeyState(vkCode);
+        return (state & 0x8000) != 0;
+    }
 
     private void SuppressHotkey(HotkeyDefinition hotkey)
     {
@@ -530,6 +556,9 @@ public sealed class GlobalHotkeyService
 
     [DllImport("user32.dll")]
     private static extern nint CallNextHookEx(nint hhk, int nCode, nint wParam, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("kernel32.dll", EntryPoint = "GetModuleHandleW", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandle(string? lpModuleName);

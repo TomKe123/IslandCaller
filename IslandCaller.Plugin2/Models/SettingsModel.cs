@@ -13,6 +13,34 @@ namespace IslandCaller.Models
         public HoverSetting Hover { get; set; } = new();
     }
 
+    public enum DrawSelectionScope
+    {
+        All = 0,
+        Male = 1,
+        Female = 2
+    }
+
+    public enum DrawSelectionAlgorithm
+    {
+        Balanced = 0,
+        PureRandom = 1
+    }
+
+    public enum LessonDrawScopeOption
+    {
+        FollowMain = -1,
+        All = 0,
+        Male = 1,
+        Female = 2
+    }
+
+    public enum LessonDrawAlgorithmOption
+    {
+        FollowMain = -1,
+        Balanced = 0,
+        PureRandom = 1
+    }
+
     public abstract class ProtectedSettingsObject : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -57,6 +85,8 @@ namespace IslandCaller.Models
             _pacerListJson = "[]";
             _pacerListDate = string.Empty;
             _pacerThreshold = 50;
+            _defaultDrawScope = DrawSelectionScope.All;
+            _defaultDrawAlgorithm = DrawSelectionAlgorithm.Balanced;
         }
 
         private readonly Version _version;
@@ -144,6 +174,20 @@ namespace IslandCaller.Models
         {
             get => _pacerThreshold;
             set => SetProtectedField(ref _pacerThreshold, value, nameof(PacerThreshold));
+        }
+
+        private DrawSelectionScope _defaultDrawScope;
+        public DrawSelectionScope DefaultDrawScope
+        {
+            get => _defaultDrawScope;
+            set => SetProtectedField(ref _defaultDrawScope, value, nameof(DefaultDrawScope));
+        }
+
+        private DrawSelectionAlgorithm _defaultDrawAlgorithm;
+        public DrawSelectionAlgorithm DefaultDrawAlgorithm
+        {
+            get => _defaultDrawAlgorithm;
+            set => SetProtectedField(ref _defaultDrawAlgorithm, value, nameof(DefaultDrawAlgorithm));
         }
     }
 

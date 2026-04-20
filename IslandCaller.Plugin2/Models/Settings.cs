@@ -60,6 +60,8 @@ namespace IslandCaller.Models
                 IsC_GeneralKey?.SetValue("PacerListJson", Instance.General.PacerListJson);
                 IsC_GeneralKey?.SetValue("PacerListDate", Instance.General.PacerListDate);
                 IsC_GeneralKey?.SetValue("PacerThreshold", Instance.General.PacerThreshold);
+                IsC_GeneralKey?.SetValue("DefaultDrawScope", (int)Instance.General.DefaultDrawScope);
+                IsC_GeneralKey?.SetValue("DefaultDrawAlgorithm", (int)Instance.General.DefaultDrawAlgorithm);
                 SaveGachaSettings(IsC_GachaKey);
                 SaveUsbAuthSettings(IsC_UsbAuthKey);
                 IsC_ProfileKey?.SetValue("ProfileNum", Instance.Profile.ProfileNum);
@@ -122,6 +124,8 @@ namespace IslandCaller.Models
                     Instance.General.PacerListJson = (IsC_GeneralKey?.GetValue("PacerListJson") as string) ?? "[]";
                     Instance.General.PacerListDate = (IsC_GeneralKey?.GetValue("PacerListDate") as string) ?? string.Empty;
                     Instance.General.PacerThreshold = Convert.ToInt32(IsC_GeneralKey?.GetValue("PacerThreshold") ?? 50);
+                    Instance.General.DefaultDrawScope = ParseDrawScope(IsC_GeneralKey?.GetValue("DefaultDrawScope"), DrawSelectionScope.All);
+                    Instance.General.DefaultDrawAlgorithm = ParseDrawAlgorithm(IsC_GeneralKey?.GetValue("DefaultDrawAlgorithm"), DrawSelectionAlgorithm.Balanced);
                     LoadGachaSettings(IsC_GachaKey);
                     LoadUsbAuthSettings(IsC_UsbAuthKey, IsC_GachaKey);
                     Instance.Profile.ProfileNum = Convert.ToInt32(IsC_ProfileKey?.GetValue("ProfileNum"));
