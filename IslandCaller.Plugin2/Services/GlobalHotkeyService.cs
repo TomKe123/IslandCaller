@@ -171,7 +171,7 @@ public sealed class GlobalHotkeyService
         {
             var message = unchecked((int)wParam);
             var vkCode = Marshal.ReadInt32(lParam);
-            PruneReleasedKeys(vkCode);
+            PruneReleasedKeys(vkCode, includeCurrentKey: false);
 
             if (message == WmKeyDown || message == WmSysKeyDown)
             {
@@ -203,9 +203,11 @@ public sealed class GlobalHotkeyService
         {
             var message = unchecked((int)wParam);
             int mouseVkCode = GetMouseVirtualKey(message, lParam);
+            bool isMouseDownMessage = message is WmLButtonDown or WmRButtonDown or WmMButtonDown or WmXButtonDown;
 
             if (mouseVkCode != 0)
             {
+                PruneReleasedKeys(mouseVkCode, includeCurrentKey: !isMouseDownMessage);
                 if (message is WmLButtonDown or WmRButtonDown or WmMButtonDown or WmXButtonDown)
                 {
                     _pressedKeys.Add(mouseVkCode);
@@ -346,11 +348,11 @@ public sealed class GlobalHotkeyService
     private bool IsWinPressed() =>
         _pressedKeys.Contains(VkLWin) || _pressedKeys.Contains(VkRWin);
 
-    private void PruneReleasedKeys(int currentVkCode)
+    private void PruneReleasedKeys(int currentVkCode, bool includeCurrentKey)
     {
         foreach (int trackedKey in _pressedKeys.ToArray())
         {
-            if (trackedKey == currentVkCode)
+            if (!includeCurrentKey && trackedKey == currentVkCode)
             {
                 continue;
             }
