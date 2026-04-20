@@ -36,6 +36,7 @@ public partial class SettingPage : SettingsPageBase
 
     private SettingPageViewModel? vm;
     private HistoryService HistoryService;
+    private CallRecordExportService CallRecordExportService;
     private ILogger<SettingPage> logger = NullLogger<SettingPage>.Instance;
     private HotkeyBindingTarget _bindingTarget = HotkeyBindingTarget.None;
     private const int HotkeyBindingTimeoutMs = 2500;
@@ -50,6 +51,7 @@ public partial class SettingPage : SettingsPageBase
         InitializeComponent();
         vm = this.DataContext as SettingPageViewModel;
         HistoryService = IAppHost.GetService<HistoryService>();
+        CallRecordExportService = IAppHost.GetService<CallRecordExportService>();
         logger = IAppHost.TryGetService<ILogger<SettingPage>>() ?? NullLogger<SettingPage>.Instance;
         AddHandler(InputElement.KeyDownEvent, HotkeyCapture_OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(InputElement.KeyUpEvent, HotkeyCapture_OnKeyUp, RoutingStrategies.Tunnel);
@@ -251,6 +253,66 @@ public partial class SettingPage : SettingsPageBase
     {
         vm?.RefreshHistoryAndStatistics(HistoryService);
         logger?.LogInformation("刷新历史记录与统计信息");
+    }
+
+    private async void ExportHistoryButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null)
+        {
+            await CommonTaskDialogs.ShowDialog("导出失败", "无法获取窗口上下文，请重试。");
+            return;
+        }
+
+        var records = HistoryService.GetAllCallRecords();
+        if (records.Count == 0)
+        {
+            await CommonTaskDialogs.ShowDialog("暂无记录", "当前没有可导出的点名记录。请先进行点名后再导出。");
+            return;
+        }
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出点名记录.xlsx",
+            SuggestedFileName = $"点名记录_{DateTime.Now:yyyyMMdd_HHmmss}",
+            DefaultExtension = "xlsx",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("Excel 工作簿")
+                {
+                    Patterns = ["*.xlsx"],
+                    MimeTypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
+                }
+            ]
+        });
+
+        if (file is null)
+        {
+            logger.LogInformation("用户取消导出点名记录");
+            return;
+        }
+
+        try
+        {
+            string path = file.TryGetLocalPath() ?? Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.xlsx");
+            CallRecordExportService.ExportToXlsx(path);
+
+            if (file.TryGetLocalPath() is null)
+            {
+                await using var source = File.OpenRead(path);
+                await using var target = await file.OpenWriteAsync();
+                await source.CopyToAsync(target);
+                File.Delete(path);
+            }
+
+            logger.LogInformation("点名记录导出成功，Count={Count}", records.Count);
+            await CommonTaskDialogs.ShowDialog("导出完成", $"已导出 {records.Count} 条点名记录。\n文件：{file.Name}");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "导出点名记录失败");
+            await CommonTaskDialogs.ShowDialog("导出失败", "导出点名记录时发生错误，请稍后重试。");
+        }
     }
 
     private void StartQuickHotkeyBindingButton_OnClick(object? sender, RoutedEventArgs e)

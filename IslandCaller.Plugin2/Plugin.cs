@@ -33,6 +33,7 @@ namespace IslandCaller
             services.AddSingleton<LotteryService>();
             services.AddSingleton<ProfileService>();
             services.AddSingleton<HistoryService>();
+            services.AddSingleton<CallRecordExportService>();
             services.AddSingleton<CoreService>();
             services.AddSingleton<GlobalHotkeyService>();
             services.AddSingleton<LessonDrawSettingsService>();

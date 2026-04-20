@@ -14,10 +14,18 @@ namespace IslandCaller.Services
             public int LastCallIndex { get; set; }
         }
 
+        public sealed class CallRecordItem
+        {
+            public int Index { get; init; }
+            public string Name { get; init; } = string.Empty;
+            public DateTime OccurredAt { get; init; }
+        }
+
         private readonly Dictionary<string, int> historyDict = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> top20List = [];
         private readonly Dictionary<string, int> recentCallIndex = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> lastSessionHitCallCount = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<CallRecordItem> allCallRecords = [];
         private int sessionCallCount;
         private int totalLongTermCallCount;
         private GachaPityState gachaPityState = new();
@@ -43,6 +51,11 @@ namespace IslandCaller.Services
             return Path.Combine(GetBasePath(), $"{guid}.gacha.json");
         }
 
+        private string GetCallRecordsPath(Guid guid)
+        {
+            return Path.Combine(GetBasePath(), $"{guid}.records.json");
+        }
+
         public void Load(Guid guid)
         {
             Status.HistoryServiceInitialized = false;
@@ -50,6 +63,7 @@ namespace IslandCaller.Services
             recentCallIndex.Clear();
             lastSessionHitCallCount.Clear();
             top20List.Clear();
+            allCallRecords.Clear();
             sessionCallCount = 0;
             totalLongTermCallCount = 0;
             gachaPityState = LoadGachaState(guid);
@@ -91,6 +105,7 @@ namespace IslandCaller.Services
                 lastSessionHitCallCount[name] = 0;
             }
 
+            allCallRecords.AddRange(LoadCallRecords(guid));
             Status.HistoryServiceInitialized = true;
         }
 
@@ -117,6 +132,12 @@ namespace IslandCaller.Services
             sessionCallCount++;
             lastSessionHitCallCount[normalizedName] = sessionCallCount;
             top20List.Insert(0, normalizedName);
+            allCallRecords.Add(new CallRecordItem
+            {
+                Index = allCallRecords.Count + 1,
+                Name = normalizedName,
+                OccurredAt = DateTime.Now
+            });
 
             if (top20List.Count > 20)
             {
@@ -144,6 +165,7 @@ namespace IslandCaller.Services
 
             File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
             SaveGachaState(guid);
+            SaveCallRecords(guid);
         }
 
         public int GetLongTermCount(string name)
@@ -197,6 +219,7 @@ namespace IslandCaller.Services
             historyDict.Clear();
             totalLongTermCallCount = 0;
             gachaPityState = new GachaPityState();
+            allCallRecords.Clear();
             foreach (var name in profileService.Members.Select(x => x.Name))
             {
                 historyDict[name] = 0;
@@ -240,6 +263,11 @@ namespace IslandCaller.Services
         public IReadOnlyList<string> GetRecentCalls(int count)
         {
             return count <= 0 ? [] : top20List.Take(count).ToList();
+        }
+
+        public IReadOnlyList<CallRecordItem> GetAllCallRecords()
+        {
+            return allCallRecords.ToList();
         }
 
         public GachaPityState GetGachaPityState()
@@ -336,6 +364,45 @@ namespace IslandCaller.Services
 
             string path = GetGachaStatePath(guid);
             File.WriteAllText(path, JsonSerializer.Serialize(gachaPityState), Encoding.UTF8);
+        }
+
+        private IReadOnlyList<CallRecordItem> LoadCallRecords(Guid guid)
+        {
+            string path = GetCallRecordsPath(guid);
+            if (!File.Exists(path))
+            {
+                return [];
+            }
+
+            try
+            {
+                var records = JsonSerializer.Deserialize<List<CallRecordItem>>(File.ReadAllText(path, Encoding.UTF8)) ?? [];
+                return records
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                    .Select((x, index) => new CallRecordItem
+                    {
+                        Index = index + 1,
+                        Name = x.Name.Trim(),
+                        OccurredAt = x.OccurredAt
+                    })
+                    .ToList();
+            }
+            catch
+            {
+                return [];
+            }
+        }
+
+        private void SaveCallRecords(Guid guid)
+        {
+            string basePath = GetBasePath();
+            if (!Directory.Exists(basePath))
+            {
+                Directory.CreateDirectory(basePath);
+            }
+
+            string path = GetCallRecordsPath(guid);
+            File.WriteAllText(path, JsonSerializer.Serialize(allCallRecords), Encoding.UTF8);
         }
     }
 }
